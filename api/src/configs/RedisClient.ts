@@ -31,11 +31,18 @@ class RedisClient {
 
     public sendAndawait(message:any){
         return new Promise((resolve)=>{
-            const id=this.generateRandomID();
-            this.client.subscribe(id,(message:any)=>{
+           const id = this.generateRandomID();
+
+            const handler = (channel: string, msg: string) => {
+            if (channel === id) {
                 this.client.unsubscribe(id);
-                resolve(JSON.parse(message));
-            })
+                this.client.off("message", handler);
+                resolve(JSON.parse(msg));
+            }
+            };
+
+            this.client.subscribe(id);
+            this.client.on("message", handler);
             this.publisher.rpush("message",JSON.stringify({clientId:id,message}));
         })
     }

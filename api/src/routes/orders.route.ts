@@ -25,7 +25,7 @@ ordersRouter.post("/", async (req, res) => {
         timestamp: Date.now()
       }
     });
-
+    console.log("this is the response of execution",response)
     res.json(response.payload)
 
   } catch (err) {

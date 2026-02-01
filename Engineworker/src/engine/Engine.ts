@@ -46,11 +46,12 @@ class Engine{
         fs.writeFileSync("./snapshot.json",JSON.stringify(snap));
     }
     processOrders({message,clientId}:{message:any,clientId:string}){
-        const typeofOrder=message.type;
+        const typeofOrder=message.type.toUpperCase();
+        console.log("this is the message",message);
         switch(typeofOrder){
             case "CREATE_ORDER":
                 try{
-                    const {executedqty,fills,orderId}=this.createOrder(message.payload.market,message.payload.side,message.payload.kind,message.payload.price,message.payload.quantity,message.payload.userId);
+                    const {executedqty,fills,orderId}=this.createOrder(message.data.market,message.data.side,message.data.kind,message.data.price,message.data.quantity,message.data.userId);
                     const redis=RedisManager.getInstance();
                     redis.sendToApi(clientId,{
                         type:"ORDER_PLACED",
@@ -147,3 +148,4 @@ class Engine{
     
      
 };
+export default Engine;

@@ -69,7 +69,7 @@ export class Orderbook{
         let executedqty:number=0;
         for(const ask of this.asks){
             
-      if (order.kind === "LIMIT" && order.price < ask.price) break;
+            if (order.kind === "LIMIT" && order.price < ask.price) break;
             if(order.kind=="LIMIT"){
                 if(order.price>=ask.price && executedqty<order.quantity){
                     const filledqty=Math.min(order.quantity-executedqty,ask.quantity-ask.filledQuantity);
@@ -93,6 +93,7 @@ export class Orderbook{
                return {fills,executedqty};
             }
         }
+         return { executedqty, fills };
     }
     mactchAsks(order:Order){
         let fills:Fills[]=[];
@@ -118,6 +119,7 @@ export class Orderbook{
                 return {fills,executedqty};
             }
         }
+         return { executedqty, fills };
     }
 
 }
