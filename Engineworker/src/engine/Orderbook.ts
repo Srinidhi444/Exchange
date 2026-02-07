@@ -67,58 +67,56 @@ export class Orderbook{
     matchBids(order:Order){
         const fills:Fills[]=[];
         let executedqty:number=0;
+        this.asks.sort((a,b)=>a.price-b.price);
         for(const ask of this.asks){
             
-            if (order.kind === "LIMIT" && order.price < ask.price) break;
+            if (order.kind === "LIMIT" && Number(order.price) < Number(ask.price)) break;
             if(order.kind=="LIMIT"){
                 if(order.price>=ask.price && executedqty<order.quantity){
                     const filledqty=Math.min(order.quantity-executedqty,ask.quantity-ask.filledQuantity);
                     ask.filledQuantity+=filledqty;
                     executedqty+=filledqty;
+                    this.lastTradeId++;
                     fills.push({
                         price:ask.price,
                         quantity:filledqty,
-                        tradeId:this.lastTradeId+1,
+                        tradeId:this.lastTradeId,
                         marketOrderId:order.orderId,
                         otheruserId:ask.userId,
                     })
                     
                 }
-                for(let i=0;i<this.asks.length;i++){
-                    if(this.asks[i].filledQuantity==this.asks[i].quantity){
-                        this.asks.splice(i,1);
-                        i--;
-                }
-                }
-               return {fills,executedqty};
+               
+             
             }
         }
+        this.asks = this.asks.filter(a => a.filledQuantity < a.quantity);
+
          return { executedqty, fills };
     }
     mactchAsks(order:Order){
         let fills:Fills[]=[];
         let executedqty:number=0;
+        this.bids.sort((a,b)=>b.price-a.price);
         for(let i=0;i<this.bids.length;i++){
+            
             if(this.bids[i].price>=order.price && executedqty<order.quantity){
                 const remainingqty=Math.min(order.quantity-executedqty,this.bids[i].quantity-this.bids[i].filledQuantity);
                 this.bids[i].filledQuantity+=remainingqty;
                 executedqty+=remainingqty;
+                this.lastTradeId++;
                 fills.push({
                     price:this.bids[i].price,
                     quantity:remainingqty,
-                    tradeId:this.lastTradeId+1,
+                    tradeId:this.lastTradeId,
                     marketOrderId:order.orderId,
                     otheruserId:this.bids[i].userId,
                 })
-                for(let i=0;i<this.bids.length;i++){
-                    if(this.bids[i].filledQuantity==this.bids[i].quantity){
-                        this.bids.splice(i,1);
-                        i--;
-                    }
-                }
-                return {fills,executedqty};
+                
+               
             }
         }
+        this.bids = this.bids.filter(b => b.filledQuantity < b.quantity);
          return { executedqty, fills };
     }
 

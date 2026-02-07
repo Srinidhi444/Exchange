@@ -39,6 +39,7 @@ class Engine{
 
     }
     saveSnapshot(){
+        console.log("SNAPSHOT SAVED", Date.now());
         const snap={
             orderbooks:this.orderbooks.map(o=>o.getSnapshot()),
             userBalances:Array.from(this.userBalances.entries())
@@ -78,11 +79,12 @@ class Engine{
     checklockfunds(userId:string,baseAsset:string,quoteAsset:string,side:SIDE,price:number,quantity:number){
         const userbalance=this.userBalances.get(userId);
         if(side=="BUY"){
-             if((userbalance![quoteAsset].available)<price*quantity){
+            const cost=price*quantity;
+             if((userbalance![quoteAsset].available)<cost){
                 throw new Error("Insufficient Funds");
              }
-             userbalance![quoteAsset].available-=quantity;
-             userbalance![quoteAsset].locked+=quantity;
+             userbalance![quoteAsset].available-=cost;
+             userbalance![quoteAsset].locked+=cost;
         }else{
             if((userbalance![baseAsset].available)<quantity){
                 throw new Error("Insufficient Funds");
@@ -99,7 +101,7 @@ class Engine{
             throw new Error("Market not found");
         }
         const order:Order={
-            price,
+            price: Number(price),
             quantity,
             filledQuantity:0,
             side,
@@ -121,7 +123,7 @@ class Engine{
             fills.forEach(fill=>{
                 this.userBalances.get(fill.otheruserId)![quoteAsset].available+=fill.price*fill.quantity;
                 this.userBalances.get(fill.otheruserId)![baseAsset].locked-=fill.quantity;
-                this.userBalances.get(userId)![quoteAsset].locked-=fill.quantity;
+                this.userBalances.get(userId)![quoteAsset].locked-=fill.price * fill.quantity;
                 this.userBalances.get(userId)![baseAsset].available+=fill.quantity;
             })
         }else{
@@ -135,6 +137,16 @@ class Engine{
     }
      setBaseBalances() {
         this.userBalances.set("1", {
+            [BASE_CURRENCY]: {
+                available: 10000000,
+                locked: 0
+            },
+            "USDT": {
+                available: 10000000,
+                locked: 0
+            }
+        });
+        this.userBalances.set("2", {
             [BASE_CURRENCY]: {
                 available: 10000000,
                 locked: 0
