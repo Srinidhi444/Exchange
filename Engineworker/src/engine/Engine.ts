@@ -3,6 +3,7 @@ import fs from "fs";
 import { Orderbook } from "./Orderbook";
 import { Fills, KIND, Order, SIDE } from "../types/Orderbook.types";
 import { v4 as uuidv4, v4 } from "uuid";
+import { timeStamp } from "console";
 export const BASE_CURRENCY="BTC";
 
 interface UserBalance{
@@ -117,6 +118,47 @@ class Engine{
             executedqty,
             fills
         }
+    }
+
+    createDBOrder(fills:Fills[],market:string,userId:string){
+        fills.forEach(fill=>{
+            RedisManager.getInstance().pushMessageToDB({
+                type:"TRADE_CREATED",
+                data:{
+                    tradeId:fill.tradeId,
+                    market:market,
+                    price:fill.price,
+                    isbuyerMaker:fill.otheruserId===userId?false:true,
+                    quantity:fill.quantity.toString(),
+                    quoteQuantity:(fill.price*fill.quantity).toString(),
+                    timestamp:new Date(),    
+                }
+            })
+        })
+    }
+    updateDBOrders(orders:Order,executedqty:number,fills:Fills[],market:string){
+        RedisManager.getInstance().pushMessageToDB({
+            type:"ORDER_UPDATED",
+            data:{
+               orderId:orders.orderId,
+               executedqty:executedqty,
+               market:market,
+               price:orders.price.toString(),
+               quantity:orders.quantity.toString(),
+               side:orders.side,
+               kind:orders.kind,
+            }
+        })
+        fills.forEach(fill=>[
+            RedisManager.getInstance().pushMessageToDB({
+                type:"ORDER_UPDATED",
+                data:{
+                    orderId:fill.marketOrderId,
+                    executedqty:fill.quantity,
+                }
+            })
+
+        ])
     }
     updateBalances(userId:string,baseAsset:string,quoteAsset:string,side:SIDE,fills:Fills[]){
         if(side=="BUY"){
