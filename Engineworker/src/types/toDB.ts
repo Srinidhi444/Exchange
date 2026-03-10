@@ -27,4 +27,19 @@ export type OrderUpdatedMessageToDB={
         executedqty:number;
     }
 } 
-export type DBOrders= MessageToDB | OrderUpdatedMessageToDB;
+export type OrderCreated = {
+  type: "ORDER_CREATED";
+  data: {
+    orderId: string;
+    userId: string;
+    market: string;
+    side: SIDE;
+    kind: KIND;
+    price: number;
+    quantity: number;
+    remainingQuantity: number;
+  };
+};
+
+
+export type DBOrders= MessageToDB | OrderUpdatedMessageToDB | OrderCreated;

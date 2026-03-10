@@ -111,8 +111,25 @@ class Engine{
             orderId:uuidv4()
         }
         // @ts-ignore
+        RedisManager.getInstance().pushMessageToDB({
+            type: "ORDER_CREATED",
+            data: {
+                orderId: order.orderId,
+                userId: order.userId,
+                market,
+                side: order.side,
+                kind: order.kind,
+                price: order.price,
+                quantity: order.quantity,
+                remainingQuantity: order.quantity
+            }
+            });
+            // @ts-ignore
         const {executedqty,fills}=orderbook.addOrder(order);
         this.updateBalances(userId,baseAsset,quoteAsset,side,fills);
+        
+        this.createDBOrder(fills,market,userId);
+        this.updateDBOrders(order,executedqty,fills,market);
         return {
             orderId:order.orderId,
             executedqty,
@@ -149,7 +166,7 @@ class Engine{
                kind:orders.kind,
             }
         })
-        fills.forEach(fill=>[
+        fills.forEach(fill=>{
             RedisManager.getInstance().pushMessageToDB({
                 type:"ORDER_UPDATED",
                 data:{
@@ -158,7 +175,7 @@ class Engine{
                 }
             })
 
-        ])
+    })
     }
     updateBalances(userId:string,baseAsset:string,quoteAsset:string,side:SIDE,fills:Fills[]){
         if(side=="BUY"){

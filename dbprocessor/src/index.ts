@@ -41,6 +41,7 @@ async function main(){
         trade.isbuyerMaker,
         trade.timestamp
       ]);
+      console.log("inserted in db successfully");
 
     } else if (message.type === "ORDER_UPDATED") {
       const order = message.data;
@@ -59,7 +60,36 @@ async function main(){
         order.executedqty,
         order.orderId
       ]);
-    }
+    } else if (message.type === "ORDER_CREATED") {
+  const order = message.data;
+
+  await client.query(`
+    INSERT INTO trade_orders (
+      id,
+      user_id,
+      market,
+      side,
+      type,
+      price,
+      quantity,
+      filled_quantity,
+      remaining_quantity,
+      status
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+  `, [
+    order.orderId,
+    order.userId,
+    order.market,
+    order.side,
+    order.kind,
+    order.price,
+    order.quantity,
+    0,
+    order.remainingQuantity,
+    'OPEN'
+  ]);
+}
 
   } catch (err) {
     console.error("DB Worker Error:", err);
