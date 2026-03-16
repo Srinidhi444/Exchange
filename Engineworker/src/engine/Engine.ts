@@ -195,27 +195,28 @@ class Engine{
         }
     }
      setBaseBalances() {
-        this.userBalances.set("1", {
-            [BASE_CURRENCY]: {
-                available: 10000000,
-                locked: 0
-            },
-            "USDT": {
-                available: 10000000,
-                locked: 0
-            }
-        });
-        this.userBalances.set("2", {
-            [BASE_CURRENCY]: {
-                available: 10000000,
-                locked: 0
-            },
-            "USDT": {
-                available: 10000000,
-                locked: 0
-            }
-        });
-    }
+    this.userBalances.set("6f8c7c4e-3c5a-4e4c-9c72-8c9a6d2f7b11", {
+        [BASE_CURRENCY]: {
+            available: 10000000,
+            locked: 0
+        },
+        "USDT": {
+            available: 10000000,
+            locked: 0
+        }
+    });
+
+    this.userBalances.set("b2e4f5a1-91c7-4e7d-8c8f-5f0a2d4b9a33", {
+        [BASE_CURRENCY]: {
+            available: 10000000,
+            locked: 0
+        },
+        "USDT": {
+            available: 10000000,
+            locked: 0
+        }
+    });
+}
     
      
 };
