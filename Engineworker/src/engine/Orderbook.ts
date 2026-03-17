@@ -119,5 +119,11 @@ export class Orderbook{
         this.bids = this.bids.filter(b => b.filledQuantity < b.quantity);
          return { executedqty, fills };
     }
+    cancelBid(order:Order){
+    
+    }
+    cancelAsk(order:Order){
+    
+    }
 
 }

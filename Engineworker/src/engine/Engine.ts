@@ -74,6 +74,16 @@ class Engine{
                     //     }
                     // })
                 }
+            case "CANCEL_ORDER":
+                try{
+                    const {orderId,market,userId}=message;
+
+
+                }catch(err){
+                    console.error("error in cancelling order");
+                    throw err;
+                    
+                }
             
         }
     }
@@ -137,6 +147,39 @@ class Engine{
         }
     }
 
+    cancelOrder(orderId:string,market:string,userId:string){
+        const orderbook=this.orderbooks.find(o=>o.ticker()==market);
+        if(!orderbook){
+            throw new Error("No orderbook found for this market");
+        }
+
+        const [baseAsset,quoteAsset]=market.split("_");
+
+        const order=orderbook.bids.find(bid=>bid.orderId==orderId) || orderbook.asks.find(ask=>ask.orderId==orderId);
+
+        if(!order){
+            throw new Error("No order found in the orderbook");
+        }
+        if(order.userId!=userId){
+            throw new Error("unauthorized");
+        }
+        let remainingquantity=order.quantity-order.filledQuantity;
+        let pricelevel:any;
+        if(order.side=="BUY"){
+           pricelevel=orderbook.cancelBid(order);
+           const refund=remainingquantity*order.price;
+           this.userBalances.get(userId)![quoteAsset].available+=refund;
+           this.userBalances.get(userId)![quoteAsset].locked-=refund;
+
+        }else{
+         pricelevel=orderbook.cancelAsk(order);
+           const refund=remainingquantity*order.price;
+           this.userBalances.get(userId)![baseAsset].available+=remainingquantity;
+           this.userBalances.get(userId)![baseAsset].locked-=remainingquantity;
+        }
+
+    }
+
     createDBOrder(fills:Fills[],market:string,userId:string){
         fills.forEach(fill=>{
             RedisManager.getInstance().pushMessageToDB({
@@ -177,6 +220,8 @@ class Engine{
 
     })
     }
+
+  
     updateBalances(userId:string,baseAsset:string,quoteAsset:string,side:SIDE,fills:Fills[]){
         if(side=="BUY"){
             fills.forEach(fill=>{

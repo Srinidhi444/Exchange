@@ -49,12 +49,13 @@ ordersRouter.get("/open",async(req,res)=>{
         return res.status(500).json({ error: "Internal server error" });
     }
 })
-ordersRouter.delete("/",async(req,res)=>{
+ordersRouter.delete("/order",async(req,res)=>{
     try{
         const response:any=await redis.sendAndawait({
             type:CANCEL_ORDER,
             data:{
                 orderId:req.body.orderId,
+                market:req.body.market,
                 userId:req.body.userId
             }
         })
