@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import { MessageToApi } from './types/toapi';
-import { DBOrders, MessageToDB } from './types/toDB';
+import { DBMessage } from './types/toDB';
 class RedisManager{
     private client:Redis;
     private static instance:RedisManager;
@@ -28,7 +28,7 @@ class RedisManager{
      public sendToApi(clientId: string, message: MessageToApi) {
         this.client.publish(clientId, JSON.stringify(message));
     }
-    public pushMessageToDB(message: DBOrders) {
+    public pushMessageToDB(message: DBMessage) {
         this.client.lpush("db", JSON.stringify(message));
     }
 }

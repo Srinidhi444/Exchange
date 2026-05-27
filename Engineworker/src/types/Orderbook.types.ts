@@ -16,4 +16,5 @@ export interface Fills{
     tradeId:number;
     marketOrderId:string;
     otheruserId:string;
+    marketRemainingQuantity: number;
 }
