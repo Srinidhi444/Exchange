@@ -3,7 +3,7 @@ import fs from "fs";
 import { Orderbook } from "./Orderbook";
 import { Fills, KIND, Order, SIDE } from "../types/Orderbook.types";
 import { v4 as uuidv4 } from "uuid";
-
+import {getOpenOrders} from "../db/query";
 export const BASE_CURRENCY = "BTC";
 
 interface UserBalance {
@@ -64,7 +64,7 @@ class Engine {
     fs.writeFileSync("./snapshot.json", JSON.stringify(snap));
   }
 
-  processOrders({ message, clientId }: { message: any; clientId: string }) {
+ async processOrders({ message, clientId }: { message: any; clientId: string }) {
     const typeOfOrder = message.type.toUpperCase();
 
     console.log("this is the message", message);
@@ -118,6 +118,48 @@ class Engine {
         }
 
         break;
+
+      case "GET_ORDERS":
+        console.log("Entered here")
+        try{
+            const {userId,market}=message.data;
+            const orderbook=this.orderbooks.find((o)=>o.ticker()==market);
+            if(!orderbook){
+                throw new Error("No OrderBook found");
+            }
+            const orders= await getOpenOrders(userId,market);
+            console.log("this is the orders",orders);
+            const formattedOrders=orders.map((order)=>({
+                orderId: order.id,
+                market: order.market,
+                side: order.side,
+                type: order.type,
+
+                price: Number(order.price),
+
+                quantity: Number(order.quantity),
+
+                filledQuantity: Number(
+                order.filled_quantity
+                ),
+
+                remainingQuantity: Number(
+                order.remaining_quantity
+                ),
+
+                status: order.status,
+
+                createdAt: order.created_at
+            })
+        );
+            const redis=RedisManager.getInstance();
+            redis.sendToApi(clientId,{
+                type:"OPEN_ORDERS",
+                payload:formattedOrders
+            });
+        }catch(error){
+            console.error("error while getting open orders");
+        }
     }
   }
 
@@ -211,6 +253,8 @@ class Engine {
       fills,
     };
   }
+
+ 
 
   cancelOrder(orderId: string, market: string, userId: string) {
     const orderbook = this.orderbooks.find((o) => o.ticker() == market);
@@ -377,5 +421,6 @@ class Engine {
     });
   }
 }
+
 
 export default Engine;

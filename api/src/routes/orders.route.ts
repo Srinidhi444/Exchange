@@ -34,12 +34,12 @@ ordersRouter.post("/", async (req, res) => {
   }
 });
 
-ordersRouter.get("/open",async(req,res)=>{
+ordersRouter.get("/open/:userId",async(req,res)=>{
     try{
         const response:any=await redis.sendAndawait({
             type:GET_OPEN_ORDERS,
             data:{
-                userId:req.query.userId,
+                userId:req.params.userId,
                 market:req.query.market  
             }
         })

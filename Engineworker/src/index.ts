@@ -1,7 +1,8 @@
 import Redis from "ioredis";
 import Engine from "./engine/Engine";
-
+import { ConnectDB } from "./db";
 async function main(){
+    await ConnectDB();
     const engine=new Engine();
     const client=new Redis();
    
@@ -13,7 +14,7 @@ async function main(){
               const [, response] = result;
             const parsed=JSON.parse(response);
             console.log("This is the response we got",parsed);
-            engine.processOrders({
+            await engine.processOrders({
                 message:parsed.message,
                 clientId:parsed.clientId
             });

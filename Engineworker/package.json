@@ -11,9 +11,11 @@
   "license": "ISC",
   "dependencies": {
     "fs": "^0.0.1-security",
-    "ioredis": "^5.9.2"
+    "ioredis": "^5.9.2",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
-    "@types/node": "^25.0.10"
+    "@types/node": "^25.0.10",
+    "@types/pg": "^8.20.0"
   }
 }
