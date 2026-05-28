@@ -40,4 +40,14 @@ export type MessageToApi =
 
         createdAt: Date;
       }[];
-    };
+    }
+
+  | {
+    type:"DEPTH",
+    payload:{
+      
+      bids: [string, string][];
+      asks: [string, string][];
+
+    }
+  }

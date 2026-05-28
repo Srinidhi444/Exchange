@@ -28,6 +28,9 @@ class RedisManager{
      public sendToApi(clientId: string, message: MessageToApi) {
         this.client.publish(clientId, JSON.stringify(message));
     }
+    public publishMessage(channel:string,message:any){
+        this.client.publish(channel,JSON.stringify(message))
+    }
     public pushMessageToDB(message: DBMessage) {
         this.client.lpush("db", JSON.stringify(message));
     }

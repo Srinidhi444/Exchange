@@ -50,12 +50,24 @@ export class SubscriptionManager{
             subscriber.unsubscribe(subscription);
         }
     }
-    private redisCallbackHandler(channel:string,message:string){
-        const parsedMessage=JSON.parse(message);
-        this.reversesubscriptions.get(channel)?.forEach(userId=>{
-            UserManager.getInstance().getUser(userId)?.emit(parsedMessage)
-        })
-    }
+    private redisCallbackHandler = (
+    channel: string,
+    message: string
+) => {
+
+    const parsedMessage = JSON.parse(message);
+
+    this.reversesubscriptions
+        .get(channel)
+        ?.forEach(userId => {
+
+            UserManager
+                .getInstance()
+                .getUser(userId)
+                ?.emit(parsedMessage);
+
+        });
+}
     userLeft(userId:string){
         this.subscriptions.get(userId)?.forEach(subscription=>{
             this.unsubscribe(userId,subscription);

@@ -7,6 +7,9 @@ export class Orderbook {
   quoteAsset: string = "USDT";
   lastTradeId: number;
   currentPrice: number;
+  private bidDepth = new Map<string, number>();
+
+    private askDepth = new Map<string, number>();
 
   constructor(
     baseAsset: string,
@@ -37,6 +40,7 @@ export class Orderbook {
   }
 
   addOrder(order: Order) {
+    console.log("ADD ORDERBOOK INSTANCE", this);
     if (order.side == "BUY") {
       const result = this.matchBids(order);
       if (!result) return;
@@ -48,7 +52,10 @@ export class Orderbook {
           fills,
         };
       }
+      console.log("ADDING TO BIDS", order);
       this.bids.push(order);
+     console.log(this.bids);
+     console.log(this.asks);
       return {
         executedQty,
         fills,
@@ -64,11 +71,13 @@ export class Orderbook {
           fills,
         };
       }
+    console.log("ADDING TO Asks", order);
       this.asks.push(order);
       return {
         executedQty,
         fills,
-      };
+    };
+    
     }
   }
 
@@ -161,5 +170,64 @@ export class Orderbook {
       return price;
     }
   }
+ getDepth() {
 
+    console.log("Entered into the depth function");
+
+    const bids: [string, string][] = [];
+
+    const asks: [string, string][] = [];
+
+    const bidsObj = new Map<string, number>();
+
+    const asksObj = new Map<string, number>();
+
+    for (const order of this.bids) {
+
+        const price = order.price.toString();
+
+        bidsObj.set(
+            price,
+            (bidsObj.get(price) || 0)
+            + Number(order.quantity - order.filledQuantity)
+        );
+    }
+
+    for (const order of this.asks) {
+
+        const price = order.price.toString();
+
+        asksObj.set(
+            price,
+            (asksObj.get(price) || 0)
+            + Number(order.quantity - order.filledQuantity)
+        );
+    }
+
+    for (const [price, quantity] of bidsObj) {
+
+        bids.push([
+            price,
+            quantity.toString()
+        ]);
+    }
+
+    for (const [price, quantity] of asksObj) {
+
+        asks.push([
+            price,
+            quantity.toString()
+        ]);
+    }
+
+    console.log({
+        bids,
+        asks
+    });
+
+    return {
+        bids,
+        asks
+    };
+}
 }

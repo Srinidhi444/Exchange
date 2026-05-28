@@ -160,7 +160,43 @@ class Engine {
         }catch(error){
             console.error("error while getting open orders");
         }
-    }
+        break;
+
+      case "GET_DEPTH":
+        try {
+
+            const market = message.data.market;
+
+            const orderbook = this.orderbooks.find(
+            (o) => o.ticker() === market
+            );
+
+            if (!orderbook) {
+            throw new Error("No Orderbook found");
+            }
+
+            const redis = RedisManager.getInstance();
+
+            redis.sendToApi(clientId, {
+            type: "DEPTH",
+            payload: orderbook.getDepth(),
+            });
+
+        } catch (error) {
+
+            console.log("GET_DEPTH error", error);
+
+            RedisManager.getInstance().sendToApi(clientId, {
+            type: "DEPTH",
+            payload: {
+                bids: [],
+                asks: [],
+            },
+            });
+        }
+
+        break;
+     }
   }
 
   checklockfunds(
@@ -246,6 +282,7 @@ class Engine {
     this.createDBOrder(fills, market, userId);
 
     this.updateDBOrders(order, executedQty, fills, market);
+    this.publishWsDepthUpdates(fills,order.price,side,market);
 
     return {
       orderId: order.orderId,
@@ -253,6 +290,83 @@ class Engine {
       fills,
     };
   }
+
+  publishWsDepthUpdates(
+    fills: Fills[],
+    price: number,
+    side: "BUY" | "SELL",
+    market: string
+) {
+    console.log("this is side",side);
+    const orderbook = this.orderbooks.find(
+        (o) => o.ticker() === market
+    );
+    console.log("PUBLISH ORDERBOOK INSTANCE", orderbook);
+
+    if (!orderbook) {
+        throw new Error("No orderbook found");
+    }
+
+    const depth = orderbook.getDepth();
+
+    if (side === "BUY") {
+
+        const updatedAsks = depth.asks.filter(
+            x =>
+                fills
+                    .map(f => f.price.toString())
+                    .includes(x[0])
+        );
+
+        const updatedBid = depth.bids.find(
+            x => Number(x[0]) === price
+            );
+        console.log(price, typeof price);
+        console.log("publish ws depth updates");
+        console.log(updatedBid);
+        console.log(updatedAsks);
+        RedisManager.getInstance().publishMessage(
+            `depth@${market}`,
+            {
+                stream: `depth@${market}`,
+                data: {
+                    a: updatedAsks,
+                    b: updatedBid ? [updatedBid] : [],
+                    e: "depth"
+                }
+            }
+        );
+    }
+
+    if (side === "SELL") {
+
+        const updatedBids = depth.bids.filter(
+            x =>
+                fills
+                    .map(f => f.price.toString())
+                    .includes(x[0])
+        );
+
+        const updatedAsk = depth.asks.find(
+            x => Number(x[0]) === price
+            );
+
+        console.log("publish ws depth updates");
+        console.log(updatedBids);
+        console.log(updatedAsk);
+        RedisManager.getInstance().publishMessage(
+            `depth@${market}`,
+            {
+                stream: `depth@${market}`,
+                data: {
+                    a: updatedAsk ? [updatedAsk] : [],
+                    b: updatedBids,
+                    e: "depth"
+                }
+            }
+        );
+    }
+}
 
  
 
