@@ -368,6 +368,27 @@ class Engine {
     }
 }
 
+
+    publishWsTrades(fills: Fills[],userId:string, market: string) {
+    fills.forEach(fill => {
+        RedisManager.getInstance().publishMessage(
+            `trade@${market}`,
+            {
+                stream: `trade@${market}`,
+                data: {
+                    e: "trade",
+                    t: fill.tradeId,
+                    s: market,
+                    p: fill.price.toString(),
+                    q: fill.quantity.toString(),
+                    m: fill.otheruserId==userId,
+                    T: Date.now()
+                }
+            }
+        );
+    });
+}
+
  
 
   cancelOrder(orderId: string, market: string, userId: string) {
