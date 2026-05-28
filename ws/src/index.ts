@@ -1,12 +1,22 @@
-import {WebSocketServer} from "ws";
-const wss=new WebSocketServer({port:8080});
+import { WebSocketServer } from "ws";
+import { UserManager } from "./Mangers/UserManager";;
+const wss = new WebSocketServer({
+  port: 8080,
+});
 
-wss.on("connection",(ws)=>{
-    console.log("Client Connected");
-    ws.on("message",(message)=>{
-        console.log(message.toString());
-    })
-    ws.on("close",()=>{
-        console.log("Client Disconnected");
-    })
-})
+console.log("WebSocket Server running on port 8080");
+
+wss.on("connection", (ws) => {
+
+  console.log("Client Connected");
+
+  // create + register websocket user
+  UserManager
+    .getInstance()
+    .addUser(ws);
+
+  ws.on("close", () => {
+    console.log("Client Disconnected");
+  });
+
+});
