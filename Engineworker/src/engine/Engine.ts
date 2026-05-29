@@ -424,11 +424,22 @@ class Engine {
 
       this.userBalances.get(userId)![quoteAsset].available += refund;
       this.userBalances.get(userId)![quoteAsset].locked -= refund;
+      if (pricelevel) {
+        this.sendUpdatedDepthAt(pricelevel.toString(), market);
+        }
     } else {
       pricelevel = orderbook.cancelAsk(order);
 
-      this.userBalances.get(userId)![baseAsset].available += remainingQuantity;
-      this.userBalances.get(userId)![baseAsset].locked -= remainingQuantity;
+      const leftQuantity = order.quantity - order.filledQuantity;
+
+    //@ts-ignore
+    this.balances.get(userId)[baseAsset].available += leftQuantity;
+
+    //@ts-ignore
+    this.balances.get(userId)[baseAsset].locked -= leftQuantity;
+    if (pricelevel) {
+        this.sendUpdatedDepthAt(pricelevel.toString(), market);
+    }
     }
 
     return {
@@ -438,6 +449,25 @@ class Engine {
       status: "CANCELLED" as const,
     };
   }
+
+   sendUpdatedDepthAt(price: string, market: string) {
+        const orderbook = this.orderbooks.find(o => o.ticker() === market);
+        if (!orderbook) {
+            return;
+        }
+        const depth = orderbook.getDepth();
+        const updatedBids = depth?.bids.filter(x => x[0] === price);
+        const updatedAsks = depth?.asks.filter(x => x[0] === price);
+        
+        RedisManager.getInstance().publishMessage(`depth@${market}`, {
+            stream: `depth@${market}`,
+            data: {
+                a: updatedAsks.length ? updatedAsks : [[price, "0"]],
+                b: updatedBids.length ? updatedBids : [[price, "0"]],
+                e: "depth"
+            }
+        });
+    }
 
   createDBOrder(fills: Fills[], market: string, userId: string) {
     fills.forEach((fill) => {
