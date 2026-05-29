@@ -17,13 +17,15 @@ tradesRouter.get("/", async (req, res) => {
             `
             SELECT 
                 id,
+                market,
                 price,
                 quantity,
-                "isBuyerMaker",
-                "timestamp"
+                quote_quantity,
+                is_buyer_maker,
+                created_at
             FROM trades
             WHERE market = $1
-            ORDER BY "timestamp" DESC
+            ORDER BY created_at DESC
             LIMIT 50
             `,
             [market]
