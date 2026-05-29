@@ -1,11 +1,11 @@
-import { pgClient } from "./index";
+import {pool } from "./index";
 
 export async function getOpenOrders(
   userId: string,
   market: string
 ) {
 
-  const result = await pgClient.query(`
+  const result = await pool.query(`
     SELECT *
     FROM trade_orders
     WHERE user_id = $1

@@ -47,9 +47,19 @@ export type OrderCancelledMessage = {
         status: "CANCELLED";
     };
 };
+export type MarketTickMessage={
+    type:"MARKET_TICK_ADDED",
+    data:{
+        market:string,
+        price:number;
+        volume:number;
+        createdAt: number
+    }
+}
 
 export type DBMessage =
     | TradeCreatedMessage
     | OrderCreatedMessage
     | OrderUpdatedMessage
-    | OrderCancelledMessage;
+    | OrderCancelledMessage
+    | MarketTickMessage;

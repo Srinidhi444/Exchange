@@ -14,6 +14,10 @@ async function initializeDB() {
   await client.query(`
     CREATE EXTENSION IF NOT EXISTS pgcrypto;
   `);
+    
+    await client.query(`
+  CREATE EXTENSION IF NOT EXISTS timescaledb;
+`);
 
   // Trades table
   await client.query(`
@@ -87,6 +91,86 @@ async function initializeDB() {
         ON DELETE CASCADE
     );
   `);
+
+  await client.query(`
+  CREATE TABLE IF NOT EXISTS market_ticks (
+    id BIGSERIAL PRIMARY KEY,
+
+    market VARCHAR(20) NOT NULL,
+
+    price NUMERIC(30,10) NOT NULL,
+    volume NUMERIC(30,10) NOT NULL,
+
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+`);
+await client.query(`
+  DROP MATERIALIZED VIEW IF EXISTS klines_1m;
+`);
+
+await client.query(`
+  DROP MATERIALIZED VIEW IF EXISTS klines_5m;
+`);
+
+await client.query(`
+  DROP MATERIALIZED VIEW IF EXISTS klines_1h;
+`);
+
+  await client.query(`
+  CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1m AS
+  SELECT
+      time_bucket('1 minute', created_at) AS bucket,
+
+      first(price, created_at) AS open,
+      max(price) AS high,
+      min(price) AS low,
+      last(price, created_at) AS close,
+
+      sum(volume) AS volume,
+
+      market
+
+  FROM market_ticks
+
+  GROUP BY bucket, market;
+`);
+await client.query(`
+  CREATE MATERIALIZED VIEW IF NOT EXISTS klines_5m AS
+  SELECT
+      time_bucket('5 minutes', created_at) AS bucket,
+
+      first(price, created_at) AS open,
+      max(price) AS high,
+      min(price) AS low,
+      last(price, created_at) AS close,
+
+      sum(volume) AS volume,
+
+      market
+
+  FROM market_ticks
+
+  GROUP BY bucket, market;
+`);
+
+await client.query(`
+  CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1h AS
+  SELECT
+      time_bucket('1 hour', created_at) AS bucket,
+
+      first(price, created_at) AS open,
+      max(price) AS high,
+      min(price) AS low,
+      last(price, created_at) AS close,
+
+      sum(volume) AS volume,
+
+      market
+
+  FROM market_ticks
+
+  GROUP BY bucket, market;
+`);
 
   // Indexes
   await client.query(`

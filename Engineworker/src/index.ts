@@ -1,8 +1,8 @@
 import Redis from "ioredis";
 import Engine from "./engine/Engine";
-import { ConnectDB } from "./db";
+import { connectDB } from "./db";
 async function main(){
-    await ConnectDB();
+    await connectDB();
     const engine=new Engine();
     const client=new Redis();
    

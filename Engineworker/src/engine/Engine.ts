@@ -278,7 +278,17 @@ class Engine {
     const { executedQty, fills } = orderbook.addOrder(order);
 
     this.updateBalances(userId, baseAsset, quoteAsset, side, fills);
-
+    fills.forEach((fill:any) => {
+    RedisManager.getInstance().pushMessageToDB({
+        type: "MARKET_TICK_ADDED",
+        data: {
+        market,
+        price: fill.price,
+        volume: fill.quantity,
+        createdAt: Date.now()
+        }
+    });
+    });
     this.createDBOrder(fills, market, userId);
 
     this.updateDBOrders(order, executedQty, fills, market);
@@ -483,6 +493,8 @@ class Engine {
           timestamp: new Date(),
         },
       });
+
+      
     });
   }
 
