@@ -32,32 +32,36 @@ async function main() {
       console.log("DB Worker received message:", message.type);
 
       if (message.type === "TRADE_CREATED") {
-        const trade = message.data;
+  const trade = message.data;
 
-        await client.query(
-          `
-          INSERT INTO trades (
-            market,
-            price,
-            quantity,
-            quote_quantity,
-            is_buyer_maker,
-            created_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6)
-          `,
-          [
-            trade.market,
-            trade.price,
-            trade.quantity,
-            trade.quoteQuantity,
-            trade.isBuyerMaker,
-            trade.timestamp,
-          ],
-        );
+  await client.query(
+    `
+    INSERT INTO trades (
+      market,
+      buyer_user_id,
+      seller_user_id,
+      price,
+      quantity,
+      quote_quantity,
+      is_buyer_maker,
+      created_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `,
+    [
+      trade.market,
+      trade.buyerUserId,
+      trade.sellerUserId,
+      trade.price,
+      trade.quantity,
+      trade.quoteQuantity,
+      trade.isBuyerMaker,
+      new Date(trade.timestamp),
+    ],
+  );
 
-        console.log("Trade inserted successfully");
-      } else if (message.type === "ORDER_UPDATED") {
+  console.log("Trade inserted successfully");
+} else if (message.type === "ORDER_UPDATED") {
         const order = message.data;
 
         await client.query(

@@ -1,13 +1,14 @@
-export const SUBSCRIBE="SUBSCRIBE";
-export const UNSUBSCRIBE="UNSUBSCRIBE";
+export const SUBSCRIBE = "SUBSCRIBE";
 
-export type SubscribeMessage={
-    method: typeof SUBSCRIBE;
-    params: string[]
-}
-export type UnsubscribeMessage={
-    method: typeof UNSUBSCRIBE
-    params: string[]
-}
+export const UNSUBSCRIBE = "UNSUBSCRIBE";
 
-export type IncomingMessage= SubscribeMessage | UnsubscribeMessage
+export type IncomingMessage =
+  | {
+      method: typeof SUBSCRIBE;
+      params: string[];
+      token?: string;
+    }
+  | {
+      method: typeof UNSUBSCRIBE;
+      params: string[];
+    };

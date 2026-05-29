@@ -4,12 +4,20 @@ export type TradeCreatedMessage = {
     type: "TRADE_CREATED";
     data: {
         tradeId: number;
+
         market: string;
+
+        buyerUserId: string;
+        sellerUserId: string;
+
         price: number;
+
         isBuyerMaker: boolean;
+
         quantity: string;
         quoteQuantity: string;
-        timestamp: Date;
+
+        timestamp: number;
     };
 };
 

@@ -10,14 +10,14 @@ async function initializeDB() {
 
   console.log("Connected to Postgres DB");
 
-  // Enable UUID generation
+  // Extensions
   await client.query(`
     CREATE EXTENSION IF NOT EXISTS pgcrypto;
   `);
-    
-    await client.query(`
-  CREATE EXTENSION IF NOT EXISTS timescaledb;
-`);
+
+  await client.query(`
+    CREATE EXTENSION IF NOT EXISTS timescaledb;
+  `);
 
   // Trades table
   await client.query(`
@@ -25,6 +25,9 @@ async function initializeDB() {
       id BIGSERIAL PRIMARY KEY,
 
       market VARCHAR(20) NOT NULL,
+
+      buyer_user_id UUID NOT NULL,
+      seller_user_id UUID NOT NULL,
 
       price NUMERIC(30,10) NOT NULL,
       quantity NUMERIC(30,10) NOT NULL,
@@ -72,6 +75,12 @@ async function initializeDB() {
     );
   `);
 
+  await client.query(`
+    ALTER TABLE users
+    ALTER COLUMN id
+    SET DEFAULT gen_random_uuid();
+  `);
+
   // Balances table
   await client.query(`
     CREATE TABLE IF NOT EXISTS balances (
@@ -92,33 +101,37 @@ async function initializeDB() {
     );
   `);
 
+  // Market ticks
   await client.query(`
-  CREATE TABLE IF NOT EXISTS market_ticks (
-    id BIGSERIAL PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS market_ticks (
+      id BIGSERIAL PRIMARY KEY,
 
-    market VARCHAR(20) NOT NULL,
+      market VARCHAR(20) NOT NULL,
 
-    price NUMERIC(30,10) NOT NULL,
-    volume NUMERIC(30,10) NOT NULL,
+      price NUMERIC(30,10) NOT NULL,
+      volume NUMERIC(30,10) NOT NULL,
 
-    created_at TIMESTAMP DEFAULT NOW()
-  );
-`);
-await client.query(`
-  DROP MATERIALIZED VIEW IF EXISTS klines_1m;
-`);
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
 
-await client.query(`
-  DROP MATERIALIZED VIEW IF EXISTS klines_5m;
-`);
-
-await client.query(`
-  DROP MATERIALIZED VIEW IF EXISTS klines_1h;
-`);
+  // Drop old materialized views
+  await client.query(`
+    DROP MATERIALIZED VIEW IF EXISTS klines_1m;
+  `);
 
   await client.query(`
-  CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1m AS
-  SELECT
+    DROP MATERIALIZED VIEW IF EXISTS klines_5m;
+  `);
+
+  await client.query(`
+    DROP MATERIALIZED VIEW IF EXISTS klines_1h;
+  `);
+
+  // 1m klines
+  await client.query(`
+    CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1m AS
+    SELECT
       time_bucket('1 minute', created_at) AS bucket,
 
       first(price, created_at) AS open,
@@ -130,13 +143,15 @@ await client.query(`
 
       market
 
-  FROM market_ticks
+    FROM market_ticks
 
-  GROUP BY bucket, market;
-`);
-await client.query(`
-  CREATE MATERIALIZED VIEW IF NOT EXISTS klines_5m AS
-  SELECT
+    GROUP BY bucket, market;
+  `);
+
+  // 5m klines
+  await client.query(`
+    CREATE MATERIALIZED VIEW IF NOT EXISTS klines_5m AS
+    SELECT
       time_bucket('5 minutes', created_at) AS bucket,
 
       first(price, created_at) AS open,
@@ -148,14 +163,15 @@ await client.query(`
 
       market
 
-  FROM market_ticks
+    FROM market_ticks
 
-  GROUP BY bucket, market;
-`);
+    GROUP BY bucket, market;
+  `);
 
-await client.query(`
-  CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1h AS
-  SELECT
+  // 1h klines
+  await client.query(`
+    CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1h AS
+    SELECT
       time_bucket('1 hour', created_at) AS bucket,
 
       first(price, created_at) AS open,
@@ -167,10 +183,10 @@ await client.query(`
 
       market
 
-  FROM market_ticks
+    FROM market_ticks
 
-  GROUP BY bucket, market;
-`);
+    GROUP BY bucket, market;
+  `);
 
   // Indexes
   await client.query(`
@@ -181,6 +197,16 @@ await client.query(`
   await client.query(`
     CREATE INDEX IF NOT EXISTS idx_balances_user_asset
     ON balances(user_id, asset);
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_trades_buyer
+    ON trades(buyer_user_id);
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_trades_seller
+    ON trades(seller_user_id);
   `);
 
   console.log("Tables ensured.");

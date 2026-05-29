@@ -196,6 +196,14 @@ class Engine {
         }
 
         break;
+
+    case "USER_CREATED":
+        const { userId, balances } = message.data;
+
+    this.userBalances.set(userId, balances);
+
+    console.log("New user added to engine");
+    break;
      }
   }
 
@@ -276,6 +284,17 @@ class Engine {
       },
     });
 
+    RedisManager.getInstance().publishMessage(
+    `orders@${userId}`,
+    {
+        stream: `orders@${userId}`,
+        data: {
+        event: "ORDER_CREATED",
+        order
+        }
+    }
+    );
+
     // @ts-ignore
     const { executedQty, fills } = orderbook.addOrder(order);
 
@@ -291,7 +310,7 @@ class Engine {
         }
     });
     });
-    this.createDBOrder(fills, market, userId);
+    this.createDBOrder(fills, market, userId,side);
 
     this.updateDBOrders(order, executedQty, fills, market);
     this.publishWsDepthUpdates(fills,order.price,side,market);
@@ -399,6 +418,40 @@ class Engine {
                 }
             }
         );
+        RedisManager.getInstance().publishMessage(
+  `trades@${userId}`,
+  {
+    stream: `trades@${userId}`,
+    data: {
+      tradeId: fill.tradeId,
+      market,
+      price: fill.price,
+      quantity: fill.quantity,
+      side:
+        fill.otheruserId === userId
+          ? "SELL"
+          : "BUY",
+      timestamp: Date.now()
+    }
+  }
+);
+RedisManager.getInstance().publishMessage(
+  `trades@${fill.otheruserId}`,
+  {
+    stream: `trades@${fill.otheruserId}`,
+    data: {
+      tradeId: fill.tradeId,
+      market,
+      price: fill.price,
+      quantity: fill.quantity,
+      side:
+        fill.otheruserId === userId
+          ? "BUY"
+          : "SELL",
+      timestamp: Date.now()
+    }
+  }
+);
     });
 }
 
@@ -446,17 +499,26 @@ class Engine {
       const leftQuantity = order.quantity - order.filledQuantity;
 
     //@ts-ignore
-    this.balances.get(userId)[baseAsset].available += leftQuantity;
+    this.userBalances.get(userId)[baseAsset].available += leftQuantity;
 
     //@ts-ignore
-    this.balances.get(userId)[baseAsset].locked -= leftQuantity;
+    this.userBalances.get(userId)[baseAsset].locked -= leftQuantity;
 
     this.persistBalance(userId, baseAsset);
     if (pricelevel) {
         this.sendUpdatedDepthAt(pricelevel.toString(), market);
     }
     }
-
+    RedisManager.getInstance().publishMessage(
+    `orders@${userId}`,
+    {
+        stream: `orders@${userId}`,
+        data: {
+        event: "ORDER_CANCELLED",
+        orderId
+        }
+    }
+    );
     return {
       orderId: order.orderId,
       executedQty: order.filledQuantity,
@@ -484,24 +546,49 @@ class Engine {
         });
     }
 
-  createDBOrder(fills: Fills[], market: string, userId: string) {
-    fills.forEach((fill) => {
-      RedisManager.getInstance().pushMessageToDB({
-        type: "TRADE_CREATED",
-        data: {
-          tradeId: fill.tradeId,
-          market: market,
-          price: fill.price,
-          isBuyerMaker: fill.otheruserId === userId ? false : true,
-          quantity: fill.quantity.toString(),
-          quoteQuantity: (fill.price * fill.quantity).toString(),
-          timestamp: new Date(),
-        },
-      });
+ 
+  createDBOrder(
+  fills: Fills[],
+  market: string,
+  userId: string,
+  side: SIDE
+) {
+  fills.forEach((fill) => {
 
-      
+    RedisManager.getInstance().pushMessageToDB({
+      type: "TRADE_CREATED",
+      data: {
+        tradeId: fill.tradeId,
+
+        market,
+
+        buyerUserId:
+          side === "BUY"
+            ? userId
+            : fill.otheruserId,
+
+        sellerUserId:
+          side === "SELL"
+            ? userId
+            : fill.otheruserId,
+
+        price: fill.price,
+
+        isBuyerMaker:
+          fill.otheruserId === userId,
+
+        quantity: fill.quantity.toString(),
+
+        quoteQuantity:
+          (fill.price * fill.quantity).toString(),
+
+        timestamp: Date.now(),
+      },
     });
-  }
+
+  });
+  
+}
 
   updateDBOrders(
     orders: Order,
@@ -528,6 +615,23 @@ class Engine {
       },
     });
 
+    RedisManager.getInstance().publishMessage(
+    `orders@${orders.userId}`,
+    {
+        stream: `orders@${orders.userId}`,
+        data: {
+        event: "ORDER_UPDATED",
+        orderId: orders.orderId,
+        executedQty,
+        remainingQuantity,
+        status:
+            remainingQuantity === 0
+            ? "FILLED"
+            : "PARTIALLY_FILLED"
+        }
+    }
+    );
+
     fills.forEach((fill) => {
       RedisManager.getInstance().pushMessageToDB({
         type: "ORDER_UPDATED",
@@ -541,6 +645,24 @@ class Engine {
               : ("PARTIALLY_FILLED" as const),
         },
       });
+
+       RedisManager.getInstance().publishMessage(
+    `orders@${fill.otheruserId}`,
+    {
+      stream: `orders@${fill.otheruserId}`,
+      data: {
+        event: "ORDER_UPDATED",
+        orderId: fill.marketOrderId,
+        executedQty: fill.quantity,
+        remainingQuantity:
+          fill.marketRemainingQuantity,
+        status:
+          fill.marketRemainingQuantity === 0
+            ? "FILLED"
+            : "PARTIALLY_FILLED"
+      }
+    }
+  );
     });
   }
 
@@ -616,6 +738,17 @@ class Engine {
       locked: balance.locked,
     },
   });
+  RedisManager.getInstance().publishMessage(
+  `balances@${userId}`,
+  {
+    stream: `balances@${userId}`,
+    data: {
+      asset,
+      available: balance.available,
+      locked: balance.locked
+    }
+  }
+);
 }
 
   setBaseBalances() {

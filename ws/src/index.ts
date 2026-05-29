@@ -1,5 +1,6 @@
 import { WebSocketServer } from "ws";
-import { UserManager } from "./Mangers/UserManager";;
+import { UserManager } from "./Mangers/UserManager";
+
 const wss = new WebSocketServer({
   port: 8080,
 });
@@ -10,7 +11,6 @@ wss.on("connection", (ws) => {
 
   console.log("Client Connected");
 
-  // create + register websocket user
   UserManager
     .getInstance()
     .addUser(ws);

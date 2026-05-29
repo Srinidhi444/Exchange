@@ -28,6 +28,15 @@ class RedisClient {
         }
         return this.instance;
     }
+    public sendMessage(message: any) {
+        this.publisher.rpush(
+            "message",
+            JSON.stringify({
+                clientId: null,
+                message
+            })
+        );
+    }
 
     public sendAndawait(message:any){
         return new Promise((resolve)=>{

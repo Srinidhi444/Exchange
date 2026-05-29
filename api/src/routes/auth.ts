@@ -2,9 +2,10 @@ import { Router } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { client } from "../db";
+import RedisClient from "../configs/RedisClient";
 
 export const authroutes = Router();
-
+const redis = RedisClient.getInstance();
 authroutes.post("/signup", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -59,6 +60,24 @@ authroutes.post("/signup", async (req, res) => {
             `,
             [userId]
         );
+
+        // notify engine
+        redis.sendMessage({
+            type: "USER_CREATED",
+            data: {
+                userId,
+                balances: {
+                    BTC: {
+                        available: 10,
+                        locked: 0,
+                    },
+                    USDT: {
+                        available: 100000,
+                        locked: 0,
+                    },
+                },
+            },
+        });
 
         const token = jwt.sign(
             {
