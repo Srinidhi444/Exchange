@@ -218,6 +218,7 @@ class Engine {
 
       userbalance![quoteAsset].available -= cost;
       userbalance![quoteAsset].locked += cost;
+      this.persistBalance(userId, quoteAsset);
     } else {
       if (userbalance![baseAsset].available < quantity) {
         throw new Error("Insufficient Funds");
@@ -225,6 +226,7 @@ class Engine {
 
       userbalance![baseAsset].available -= quantity;
       userbalance![baseAsset].locked += quantity;
+      this.persistBalance(userId, baseAsset);
     }
   }
 
@@ -434,6 +436,7 @@ class Engine {
 
       this.userBalances.get(userId)![quoteAsset].available += refund;
       this.userBalances.get(userId)![quoteAsset].locked -= refund;
+      this.persistBalance(userId, quoteAsset);
       if (pricelevel) {
         this.sendUpdatedDepthAt(pricelevel.toString(), market);
         }
@@ -447,6 +450,8 @@ class Engine {
 
     //@ts-ignore
     this.balances.get(userId)[baseAsset].locked -= leftQuantity;
+
+    this.persistBalance(userId, baseAsset);
     if (pricelevel) {
         this.sendUpdatedDepthAt(pricelevel.toString(), market);
     }
@@ -539,41 +544,79 @@ class Engine {
     });
   }
 
-  updateBalances(
-    userId: string,
-    baseAsset: string,
-    quoteAsset: string,
-    side: SIDE,
-    fills: Fills[],
-  ) {
-    if (side == "BUY") {
-      fills.forEach((fill) => {
-        this.userBalances.get(fill.otheruserId)![quoteAsset].available +=
-          fill.price * fill.quantity;
+ updateBalances(
+  userId: string,
+  baseAsset: string,
+  quoteAsset: string,
+  side: SIDE,
+  fills: Fills[],
+) {
+  if (side == "BUY") {
+    fills.forEach((fill) => {
 
-        this.userBalances.get(fill.otheruserId)![baseAsset].locked -=
-          fill.quantity;
+      this.userBalances.get(fill.otheruserId)![quoteAsset].available +=
+        fill.price * fill.quantity;
 
-        this.userBalances.get(userId)![quoteAsset].locked -=
-          fill.price * fill.quantity;
+      this.persistBalance(fill.otheruserId, quoteAsset);
 
-        this.userBalances.get(userId)![baseAsset].available += fill.quantity;
-      });
-    } else {
-      fills.forEach((fill) => {
-        this.userBalances.get(fill.otheruserId)![baseAsset].available +=
-          fill.quantity;
+      this.userBalances.get(fill.otheruserId)![baseAsset].locked -=
+        fill.quantity;
 
-        this.userBalances.get(fill.otheruserId)![quoteAsset].locked -=
-          fill.price * fill.quantity;
+      this.persistBalance(fill.otheruserId, baseAsset);
 
-        this.userBalances.get(userId)![baseAsset].locked -= fill.quantity;
+      this.userBalances.get(userId)![quoteAsset].locked -=
+        fill.price * fill.quantity;
 
-        this.userBalances.get(userId)![quoteAsset].available +=
-          fill.price * fill.quantity;
-      });
-    }
+      this.persistBalance(userId, quoteAsset);
+
+      this.userBalances.get(userId)![baseAsset].available +=
+        fill.quantity;
+
+      this.persistBalance(userId, baseAsset);
+    });
+
+  } else {
+
+    fills.forEach((fill) => {
+
+      this.userBalances.get(fill.otheruserId)![baseAsset].available +=
+        fill.quantity;
+
+      this.persistBalance(fill.otheruserId, baseAsset);
+
+      this.userBalances.get(fill.otheruserId)![quoteAsset].locked -=
+        fill.price * fill.quantity;
+
+      this.persistBalance(fill.otheruserId, quoteAsset);
+
+      this.userBalances.get(userId)![baseAsset].locked -=
+        fill.quantity;
+
+      this.persistBalance(userId, baseAsset);
+
+      this.userBalances.get(userId)![quoteAsset].available +=
+        fill.price * fill.quantity;
+
+      this.persistBalance(userId, quoteAsset);
+    });
   }
+}
+
+  persistBalance(userId: string, asset: string) {
+  const balance = this.userBalances.get(userId)?.[asset];
+
+  if (!balance) return;
+
+  RedisManager.getInstance().pushMessageToDB({
+    type: "BALANCE_UPDATED",
+    data: {
+      userId,
+      asset,
+      available: balance.available,
+      locked: balance.locked,
+    },
+  });
+}
 
   setBaseBalances() {
     this.userBalances.set("6f8c7c4e-3c5a-4e4c-9c72-8c9a6d2f7b11", {

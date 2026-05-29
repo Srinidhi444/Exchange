@@ -147,7 +147,28 @@ async function main() {
         );
 
         console.log("Market tick inserted successfully");
-      } else {
+      } else if (message.type === "BALANCE_UPDATED") {
+  const balance = message.data;
+
+  await client.query(
+    `
+    UPDATE balances
+    SET
+      available = $1,
+      locked = $2
+    WHERE
+      user_id = $3
+      AND asset = $4
+    `,
+    [
+      balance.available,
+      balance.locked,
+      balance.userId,
+      balance.asset
+    ]
+  );
+}
+      else {
         console.warn("Unknown message type:", message.type);
       }
     } catch (err) {

@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
 export function authMiddleware(req:AuthRequest,res:Response,next:NextFunction){
     try{
         const authHeader=req.headers.authorization;
+        console.log(authHeader)
         if(!authHeader){
             return res.status(401).json({
                 message:"Authorization headers missing"
@@ -24,6 +25,7 @@ export function authMiddleware(req:AuthRequest,res:Response,next:NextFunction){
             })
         }
         const decoded=jwt.verify(token,process.env.JWT_SECRET as string) as {userId:string};
+        console.log("this is decoded",decoded);
         req.userId = decoded.userId;
         next();
     }catch(err){

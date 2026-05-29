@@ -57,9 +57,20 @@ export type MarketTickMessage={
     }
 }
 
+export type BalanceUpdates = {
+    type: "BALANCE_UPDATED",
+    data: {
+        userId: string,
+        asset: string,
+        available: number,
+        locked: number
+    }
+}
+
 export type DBMessage =
     | TradeCreatedMessage
     | OrderCreatedMessage
     | OrderUpdatedMessage
     | OrderCancelledMessage
-    | MarketTickMessage;
+    | MarketTickMessage
+    | BalanceUpdates;

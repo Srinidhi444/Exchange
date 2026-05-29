@@ -1,6 +1,7 @@
 import {Router} from "express";
 import RedisClient from "../configs/RedisClient";
 
+
 export const depthrouter=Router();
 const redis = RedisClient.getInstance();
 depthrouter.get("/",async(req,res)=>{
