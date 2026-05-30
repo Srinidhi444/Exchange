@@ -7,10 +7,6 @@ export class Orderbook {
   quoteAsset: string = "USDT";
   lastTradeId: number;
   currentPrice: number;
-  private bidDepth = new Map<string, number>();
-
-    private askDepth = new Map<string, number>();
-
   constructor(
     baseAsset: string,
     bids: Order[],

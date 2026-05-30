@@ -6,6 +6,7 @@ import RedisClient from "../configs/RedisClient";
 
 export const authroutes = Router();
 const redis = RedisClient.getInstance();
+
 authroutes.post("/signup", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -56,6 +57,8 @@ authroutes.post("/signup", async (req, res) => {
             )
             VALUES
                 ($1, 'BTC', 10, 0),
+                ($1, 'ETH', 100, 0),
+                ($1, 'SOL', 1000, 0),
                 ($1, 'USDT', 100000, 0)
             `,
             [userId]
@@ -69,6 +72,14 @@ authroutes.post("/signup", async (req, res) => {
                 balances: {
                     BTC: {
                         available: 10,
+                        locked: 0,
+                    },
+                    ETH: {
+                        available: 100,
+                        locked: 0,
+                    },
+                    SOL: {
+                        available: 1000,
                         locked: 0,
                     },
                     USDT: {
