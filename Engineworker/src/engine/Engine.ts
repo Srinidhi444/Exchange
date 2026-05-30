@@ -30,7 +30,7 @@ class Engine {
 
     if (snapshot) {
       const data = JSON.parse(snapshot.toString());
-
+        console.log(snapshot);
       this.orderbooks = data.orderbooks.map(
         (o: any) =>
           new Orderbook(
@@ -45,7 +45,7 @@ class Engine {
       this.userBalances = new Map(data.userBalances);
     } else {
       this.orderbooks = [new Orderbook("BTC", [], [], 0, 0)];
-      this.setBaseBalances();
+     
     }
 
     setInterval(() => {
@@ -312,8 +312,15 @@ class Engine {
     });
     this.createDBOrder(fills, market, userId,side);
 
-    this.updateDBOrders(order, executedQty, fills, market);
+    if (fills.length > 0) {
+    this.updateDBOrders(
+        order,
+        executedQty,
+        fills,
+        market
+    );
     this.publishWsDepthUpdates(fills,order.price,side,market);
+    }
     this.publishWsTrades(fills, userId, market);
 
     return {

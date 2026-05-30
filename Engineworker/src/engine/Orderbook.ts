@@ -41,6 +41,10 @@ export class Orderbook {
 
   addOrder(order: Order) {
     console.log("ADD ORDERBOOK INSTANCE", this);
+    order.price = Number(order.price);
+    order.quantity = Number(order.quantity);
+    order.filledQuantity =
+    Number(order.filledQuantity || 0);
     if (order.side == "BUY") {
       const result = this.matchBids(order);
       if (!result) return;

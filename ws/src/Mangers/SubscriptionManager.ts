@@ -56,7 +56,10 @@ export class SubscriptionManager{
 ) => {
 
     const parsedMessage = JSON.parse(message);
-
+    console.log(
+      "SUBSCRIBED USERS:",
+      this.reversesubscriptions.get(channel)
+    );
     this.reversesubscriptions
         .get(channel)
         ?.forEach(userId => {

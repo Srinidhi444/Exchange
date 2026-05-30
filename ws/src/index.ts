@@ -1,5 +1,8 @@
 import { WebSocketServer } from "ws";
 import { UserManager } from "./Mangers/UserManager";
+import { SubscriptionManager } from "./Mangers/SubscriptionManager";
+
+SubscriptionManager.getInstance();
 
 const wss = new WebSocketServer({
   port: 8080,
