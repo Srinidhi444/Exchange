@@ -19,6 +19,21 @@ client
     console.error("Error connecting to Postgres DB", err);
   });
 
+function rankStatus(status: string) {
+  switch (status) {
+    case "OPEN":
+      return 1;
+    case "PARTIALLY_FILLED":
+      return 2;
+    case "FILLED":
+      return 3;
+    case "CANCELLED":
+      return 4;
+    default:
+      return 0;
+  }
+}
+
 async function main() {
   const redisClient = new Redis();
   console.log("Connected to Redis");
@@ -32,56 +47,44 @@ async function main() {
       console.log("DB Worker received message:", message.type);
 
       if (message.type === "TRADE_CREATED") {
-  const trade = message.data;
-
-  await client.query(
-    `
-    INSERT INTO trades (
-      market,
-      buyer_user_id,
-      seller_user_id,
-      price,
-      quantity,
-      quote_quantity,
-      is_buyer_maker,
-      created_at
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `,
-    [
-      trade.market,
-      trade.buyerUserId,
-      trade.sellerUserId,
-      trade.price,
-      trade.quantity,
-      trade.quoteQuantity,
-      trade.isBuyerMaker,
-      new Date(trade.timestamp),
-    ],
-  );
-
-  console.log("Trade inserted successfully");
-} else if (message.type === "ORDER_UPDATED") {
-        const order = message.data;
+        const trade = message.data;
 
         await client.query(
           `
-          UPDATE trade_orders
-          SET filled_quantity  = filled_quantity + $1,
-              remaining_quantity = remaining_quantity - $1,
-              status = CASE
-                WHEN remaining_quantity - $1 = 0 THEN 'FILLED'
-                ELSE 'PARTIALLY_FILLED'
-              END,
-              updated_at = NOW()
-          WHERE id = $2
+          INSERT INTO trades (
+            id,
+            market,
+            buyer_user_id,
+            seller_user_id,
+            price,
+            quantity,
+            quote_quantity,
+            is_buyer_maker,
+            created_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (id) DO NOTHING
           `,
-          [order.executedQty, order.orderId],
+          [
+            trade.tradeId,
+            trade.market,
+            trade.buyerUserId,
+            trade.sellerUserId,
+            trade.price,
+            trade.quantity,
+            trade.quoteQuantity,
+            trade.isBuyerMaker,
+            new Date(trade.timestamp),
+          ]
         );
 
-        console.log("Order updated successfully");
+        console.log("Trade inserted successfully");
       } else if (message.type === "ORDER_CREATED") {
         const order = message.data;
+        const quantity = Number(order.quantity);
+        const remainingQuantity = Number(order.remainingQuantity);
+        const filledQuantity = Math.max(0, quantity - remainingQuantity);
+        const status = order.status;
 
         await client.query(
           `
@@ -98,6 +101,19 @@ async function main() {
             status
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ON CONFLICT (id) DO UPDATE
+          SET
+            filled_quantity = GREATEST(trade_orders.filled_quantity, EXCLUDED.filled_quantity),
+            remaining_quantity = LEAST(trade_orders.remaining_quantity, EXCLUDED.remaining_quantity),
+            status = CASE
+              WHEN trade_orders.status = 'CANCELLED' THEN 'CANCELLED'
+              WHEN trade_orders.status = 'FILLED' THEN 'FILLED'
+              WHEN EXCLUDED.status = 'CANCELLED' THEN 'CANCELLED'
+              WHEN EXCLUDED.status = 'FILLED' THEN 'FILLED'
+              WHEN EXCLUDED.status = 'PARTIALLY_FILLED' THEN 'PARTIALLY_FILLED'
+              ELSE trade_orders.status
+            END,
+            updated_at = NOW()
           `,
           [
             order.orderId,
@@ -106,26 +122,66 @@ async function main() {
             order.side,
             order.kind,
             order.price,
-            order.quantity,
-            0,
-            order.remainingQuantity,
-            "OPEN",
-          ],
+            quantity,
+            filledQuantity,
+            remainingQuantity,
+            status,
+          ]
         );
 
-        console.log("Order created successfully");
-      } else if (message.type === "ORDER_CANCELLED") {
+        console.log("Order created/upserted successfully");
+      } else if (message.type === "ORDER_UPDATED") {
         const order = message.data;
+        const nextFilled = Number(order.filledQuantity);
+        const nextRemaining = Number(order.remainingQuantity);
+        const nextStatus = order.status;
 
         await client.query(
           `
           UPDATE trade_orders
-          SET remaining_quantity = 0,
-              status = 'CANCELLED',
-              updated_at = NOW()
-          WHERE id = $1
+          SET
+            filled_quantity = GREATEST(filled_quantity, $1),
+            remaining_quantity = LEAST(remaining_quantity, $2),
+            status = CASE
+              WHEN status = 'CANCELLED' THEN 'CANCELLED'
+              WHEN status = 'FILLED' THEN 'FILLED'
+              WHEN $3 = 'CANCELLED' THEN 'CANCELLED'
+              WHEN $3 = 'FILLED' THEN 'FILLED'
+              WHEN $3 = 'PARTIALLY_FILLED' THEN 'PARTIALLY_FILLED'
+              ELSE status
+            END,
+            updated_at = NOW()
+          WHERE id = $4
           `,
-          [order.orderId],
+          [
+            nextFilled,
+            nextRemaining,
+            nextStatus,
+            order.orderId,
+          ]
+        );
+
+        console.log("Order updated successfully");
+      } else if (message.type === "ORDER_CANCELLED") {
+        const order = message.data;
+        const executedQty = Number(order.executedQty ?? 0);
+        const remainingQuantity = Number(order.remainingQuantity ?? 0);
+
+        await client.query(
+          `
+          UPDATE trade_orders
+          SET
+            filled_quantity = GREATEST(filled_quantity, $1),
+            remaining_quantity = $2,
+            status = 'CANCELLED',
+            updated_at = NOW()
+          WHERE id = $3
+          `,
+          [
+            executedQty,
+            remainingQuantity,
+            order.orderId,
+          ]
         );
 
         console.log("Order cancelled successfully");
@@ -135,44 +191,45 @@ async function main() {
         await client.query(
           `
           INSERT INTO market_ticks (
-              market,
-              price,
-              volume,
-              created_at
+            market,
+            price,
+            volume,
+            created_at
           )
           VALUES ($1, $2, $3, $4)
           `,
           [
-              tick.market,
-              tick.price,
-              tick.volume,
-              new Date(tick.createdAt)
+            tick.market,
+            tick.price,
+            tick.volume,
+            new Date(tick.createdAt),
           ]
         );
 
         console.log("Market tick inserted successfully");
       } else if (message.type === "BALANCE_UPDATED") {
-  const balance = message.data;
+        const balance = message.data;
 
-  await client.query(
-    `
-    UPDATE balances
-    SET
-      available = $1,
-      locked = $2
-    WHERE
-      user_id = $3
-      AND asset = $4
-    `,
-    [
-      balance.available,
-      balance.locked,
-      balance.userId,
-      balance.asset
-    ]
-  );
-}
-      else {
+        await client.query(
+          `
+          UPDATE balances
+          SET
+            available = $1,
+            locked = $2
+          WHERE
+            user_id = $3
+            AND asset = $4
+          `,
+          [
+            balance.available,
+            balance.locked,
+            balance.userId,
+            balance.asset,
+          ]
+        );
+
+        console.log("Balance updated successfully");
+      } else {
         console.warn("Unknown message type:", message.type);
       }
     } catch (err) {

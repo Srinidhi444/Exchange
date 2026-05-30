@@ -9,12 +9,14 @@ export interface Order{
     kind:KIND;
     orderId:string;
     userId:string;
+    
 }
-export interface Fills{
-    price:number;
-    quantity:number;
-    tradeId:number;
-    marketOrderId:string;
-    otheruserId:string;
-    marketRemainingQuantity: number;
-}
+export type Fills = {
+  price: number;
+  quantity: number;
+  tradeId: number;
+  marketOrderId: string;
+  otheruserId: string;
+  marketRemainingQuantity: number;
+  marketFilledQuantity: number;
+};

@@ -217,28 +217,77 @@ class Engine {
       orderId: uuidv4(),
     };
 
-    RedisManager.getInstance().pushMessageToDB({
-      type: "ORDER_CREATED",
-      data: {
-        orderId: order.orderId,
-        userId: order.userId,
-        market,
-        side: order.side,
-        kind: order.kind,
-        price: order.price,
-        quantity: order.quantity,
-        remainingQuantity: order.quantity,
-        status: "OPEN",
-      },
-    });
-
-    RedisManager.getInstance().publishMessage(`orders@${userId}`, {
-      stream: `orders@${userId}`,
-      data: { event: "ORDER_CREATED", order },
-    });
+   
 
     // @ts-ignore
-    const { executedQty, fills } = orderbook.addOrder(order);
+   console.log("BEFORE ADD ORDER", market, {
+  bids: orderbook.bids.map(o => ({
+    id: o.orderId,
+    side: o.side,
+    price: o.price,
+    qty: o.quantity,
+    filled: o.filledQuantity,
+    userId: o.userId
+  })),
+  asks: orderbook.asks.map(o => ({
+    id: o.orderId,
+    side: o.side,
+    price: o.price,
+    qty: o.quantity,
+    filled: o.filledQuantity,
+    userId: o.userId
+  })),
+});
+// @ts-ignore
+const { executedQty, fills } = orderbook.addOrder(order);
+const remainingQuantity = Math.max(0, order.quantity - executedQty);
+const status =
+  remainingQuantity <= 0
+    ? ("FILLED" as const)
+    : executedQty > 0
+    ? ("PARTIALLY_FILLED" as const)
+    : ("OPEN" as const);
+
+RedisManager.getInstance().pushMessageToDB({
+  type: "ORDER_CREATED",
+  data: {
+    orderId: order.orderId,
+    userId: order.userId,
+    market,
+    side: order.side,
+    kind: order.kind,
+    price: order.price,
+    quantity: order.quantity,
+    remainingQuantity,
+    status,
+  },
+});
+
+RedisManager.getInstance().publishMessage(`orders@${userId}`, {
+  stream: `orders@${userId}`,
+  data: {
+    event: "ORDER_CREATED",
+    order: {
+      orderId: order.orderId,
+      market,
+      side: order.side,
+      kind: order.kind,
+      price: order.price,
+      quantity: order.quantity,
+      filledQuantity: executedQty,
+      remainingQuantity,
+      status,
+      createdAt: new Date().toISOString(),
+    },
+  },
+});
+console.log("AFTER ADD ORDER", {
+  incoming: order,
+  executedQty,
+  fills,
+  bids: orderbook.bids,
+  asks: orderbook.asks,
+});
 
     this.updateBalances(userId, baseAsset, quoteAsset, side, fills);
 
@@ -432,57 +481,35 @@ class Engine {
     });
   }
 
-  updateDBOrders(orders: Order, executedQty: number, fills: Fills[], market: string) {
-    const remainingQuantity = orders.quantity - executedQty;
-    console.log("UPDATE DB ORDER", orders, executedQty);
+ updateDBOrders(order: Order, executedQty: number, fills: Fills[], market: string) {
+  fills.forEach((fill) => {
+    const makerRemaining = Math.max(0, fill.marketRemainingQuantity);
+    const makerFilledQuantity = fill.marketFilledQuantity;
+    const makerStatus =
+      makerRemaining <= 0 ? ("FILLED" as const) : ("PARTIALLY_FILLED" as const);
 
     RedisManager.getInstance().pushMessageToDB({
       type: "ORDER_UPDATED",
       data: {
-        orderId: orders.orderId,
-        executedQty,
-        remainingQuantity,
-        status: remainingQuantity === 0 ? ("FILLED" as const) : ("PARTIALLY_FILLED" as const),
+        orderId: fill.marketOrderId,
+        filledQuantity: makerFilledQuantity,
+        remainingQuantity: makerRemaining,
+        status: makerStatus,
       },
     });
 
-    RedisManager.getInstance().publishMessage(`orders@${orders.userId}`, {
-      stream: `orders@${orders.userId}`,
+    RedisManager.getInstance().publishMessage(`orders@${fill.otheruserId}`, {
+      stream: `orders@${fill.otheruserId}`,
       data: {
         event: "ORDER_UPDATED",
-        orderId: orders.orderId,
-        executedQty,
-        remainingQuantity,
-        status: remainingQuantity === 0 ? "FILLED" : "PARTIALLY_FILLED",
+        orderId: fill.marketOrderId,
+        filledQuantity: makerFilledQuantity,
+        remainingQuantity: makerRemaining,
+        status: makerStatus,
       },
     });
-
-    fills.forEach((fill) => {
-      RedisManager.getInstance().pushMessageToDB({
-        type: "ORDER_UPDATED",
-        data: {
-          orderId: fill.marketOrderId,
-          executedQty: fill.quantity,
-          remainingQuantity: fill.marketRemainingQuantity,
-          status:
-            fill.marketRemainingQuantity === 0
-              ? ("FILLED" as const)
-              : ("PARTIALLY_FILLED" as const),
-        },
-      });
-
-      RedisManager.getInstance().publishMessage(`orders@${fill.otheruserId}`, {
-        stream: `orders@${fill.otheruserId}`,
-        data: {
-          event: "ORDER_UPDATED",
-          orderId: fill.marketOrderId,
-          executedQty: fill.quantity,
-          remainingQuantity: fill.marketRemainingQuantity,
-          status: fill.marketRemainingQuantity === 0 ? "FILLED" : "PARTIALLY_FILLED",
-        },
-      });
-    });
-  }
+  });
+}
 
   updateBalances(userId: string, baseAsset: string, quoteAsset: string, side: SIDE, fills: Fills[]) {
     if (side == "BUY") {

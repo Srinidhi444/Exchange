@@ -38,12 +38,20 @@ class RedisClient {
         );
     }
 
-    public sendAndawait(message:any){
-        return new Promise((resolve)=>{
-           const id = this.generateRandomID();
+    public sendAndawait(message: any): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const id = this.generateRandomID();
+
+            // Timeout after 10 seconds
+            const timeout = setTimeout(() => {
+            this.client.unsubscribe(id);
+            this.client.off("message", handler);
+            reject(new Error("Engine response timeout"));
+            }, 10000);
 
             const handler = (channel: string, msg: string) => {
             if (channel === id) {
+                clearTimeout(timeout);
                 this.client.unsubscribe(id);
                 this.client.off("message", handler);
                 resolve(JSON.parse(msg));
@@ -52,8 +60,8 @@ class RedisClient {
 
             this.client.subscribe(id);
             this.client.on("message", handler);
-            this.publisher.rpush("message",JSON.stringify({clientId:id,message}));
-        })
+            this.publisher.rpush("message", JSON.stringify({ clientId: id, message }));
+        });
     }
     public generateRandomID(){
         const id=uuidv4();
