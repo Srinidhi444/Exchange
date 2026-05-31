@@ -12,7 +12,7 @@ export default function OrdersPage() {
   const [tab, setTab] = useState<"open" | "trades">("open");
 
   const { openOrders, setOpenOrders } = useOrdersStore();
-  const { myTrades, setMyTrades } = useTradesStore();
+  const { myTrades, setMyTrades }     = useTradesStore();
 
   useEffect(() => {
     getOpenOrders(market).then(setOpenOrders).catch(() => setOpenOrders([]));
@@ -24,117 +24,186 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="exchange-panel p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Orders</h1>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              View open orders and your recent trade activity.
-            </p>
-          </div>
 
-          <div className="flex gap-2">
-            {MARKETS.map((item) => (
-              <button
-                key={item}
-                onClick={() => setMarket(item)}
-                className={`rounded-lg px-3 py-2 text-sm ${
-                  item === market
-                    ? "bg-[var(--yellow)] text-black"
-                    : "bg-[var(--panel-3)] text-[var(--muted)]"
-                }`}
-              >
-                {item.replace("_", "/")}
-              </button>
-            ))}
-          </div>
+      {/* Page header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: "var(--text)" }}>Orders</h1>
+          <p className="mt-0.5 text-sm" style={{ color: "var(--muted)" }}>
+            Open orders and trade history across your markets.
+          </p>
+        </div>
+
+        {/* Market selector */}
+        <div
+          className="flex items-center gap-1 rounded-xl border p-1"
+          style={{ borderColor: "var(--border)", background: "var(--panel)" }}
+        >
+          {MARKETS.map((item) => (
+            <button
+              key={item}
+              onClick={() => setMarket(item)}
+              className="rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-150"
+              style={
+                item === market
+                  ? { background: "var(--panel-3)", color: "var(--text)" }
+                  : { color: "var(--muted)" }
+              }
+            >
+              {item.replace("_", "/")}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="flex gap-4 border-b border-[var(--border)]">
-        <button
-          className={`exchange-tab px-1 py-3 text-sm ${tab === "open" ? "active" : ""}`}
-          onClick={() => setTab("open")}
-        >
-          Open Orders
-        </button>
-        <button
-          className={`exchange-tab px-1 py-3 text-sm ${tab === "trades" ? "active" : ""}`}
-          onClick={() => setTab("trades")}
-        >
-          Trade History
-        </button>
+      {/* Tab bar */}
+      <div className="flex items-center gap-0 border-b" style={{ borderColor: "var(--border)" }}>
+        {(["open", "trades"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className="relative px-4 py-3 text-sm font-medium transition-colors duration-150"
+            style={{ color: tab === t ? "var(--text)" : "var(--muted)" }}
+          >
+            {t === "open" ? "Open Orders" : "Trade History"}
+            {tab === t && (
+              <span
+                className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full"
+                style={{ background: "var(--green)" }}
+              />
+            )}
+          </button>
+        ))}
       </div>
 
+      {/* Tables */}
       {tab === "open" ? (
-        <div className="exchange-panel overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead className="text-left text-[var(--muted)]">
-              <tr className="border-b border-[var(--border)]">
-                <th className="px-4 py-3 font-medium">Market</th>
-                <th className="px-4 py-3 font-medium">Side</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Price</th>
-                <th className="px-4 py-3 font-medium">Qty</th>
-                <th className="px-4 py-3 font-medium">Filled</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {openOrders.map((order) => (
-                <tr key={order.orderId} className="border-b border-[var(--border)]">
-                  <td className="px-4 py-3">{order.market}</td>
-                  <td className={`px-4 py-3 ${order.side === "BUY" ? "text-bid" : "text-ask"}`}>
-                    {order.side}
-                  </td>
-                  <td className="px-4 py-3">{order.type}</td>
-                  <td className="px-4 py-3">{formatNumber(order.price, 2)}</td>
-                  <td className="px-4 py-3">{formatNumber(order.quantity, 5)}</td>
-                  <td className="px-4 py-3">{formatNumber(order.filledQuantity, 5)}</td>
-                  <td className="px-4 py-3">{order.status}</td>
+        <div
+          className="overflow-hidden rounded-2xl border"
+          style={{ background: "var(--panel)", borderColor: "var(--border)" }}
+        >
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {["Market", "Side", "Type", "Price", "Qty", "Filled", "Status"].map((col) => (
+                    <th
+                      key={col}
+                      className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-widest"
+                      style={{ color: "var(--muted)" }}
+                    >
+                      {col}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-              {openOrders.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
-                    No open orders
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {openOrders.map((order, i) => (
+                  <tr
+                    key={order.orderId}
+                    className="transition-colors hover:bg-[var(--panel-2)]"
+                    style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}
+                  >
+                    <td className="px-4 py-3 text-sm font-medium" style={{ color: "var(--text)" }}>
+                      {order.market.replace("_", "/")}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-sm font-semibold"
+                      style={{ color: order.side === "BUY" ? "var(--green)" : "var(--red)" }}
+                    >
+                      {order.side}
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--muted)" }}>
+                      {order.type}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-sm" style={{ color: "var(--text)" }}>
+                      {formatNumber(order.price, 2)}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-sm" style={{ color: "var(--text)" }}>
+                      {formatNumber(order.quantity, 5)}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-sm" style={{ color: "var(--muted)" }}>
+                      {formatNumber(order.filledQuantity, 5)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                        style={{
+                          background:
+                            order.status === "OPEN"
+                              ? "rgba(22,199,132,0.12)"
+                              : "rgba(140,152,169,0.12)",
+                          color:
+                            order.status === "OPEN" ? "var(--green)" : "var(--muted)",
+                        }}
+                      >
+                        {order.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {openOrders.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm" style={{ color: "var(--muted)" }}>
+                      No open orders
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
-        <div className="exchange-panel overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead className="text-left text-[var(--muted)]">
-              <tr className="border-b border-[var(--border)]">
-                <th className="px-4 py-3 font-medium">Market</th>
-                <th className="px-4 py-3 font-medium">Price</th>
-                <th className="px-4 py-3 font-medium">Qty</th>
-                <th className="px-4 py-3 font-medium">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {myTrades.map((trade, i) => (
-                <tr key={`${trade.id ?? i}-${i}`} className="border-b border-[var(--border)]">
-                  <td className="px-4 py-3">{trade.market}</td>
-                  <td className="px-4 py-3">{formatNumber(trade.price, 2)}</td>
-                  <td className="px-4 py-3">{formatNumber(trade.quantity, 5)}</td>
-                  <td className="px-4 py-3">
-                    {trade.created_at ? new Date(trade.created_at).toLocaleString() : "--"}
-                  </td>
+        <div
+          className="overflow-hidden rounded-2xl border"
+          style={{ background: "var(--panel)", borderColor: "var(--border)" }}
+        >
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {["Market", "Price", "Quantity", "Time"].map((col) => (
+                    <th
+                      key={col}
+                      className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-widest"
+                      style={{ color: "var(--muted)" }}
+                    >
+                      {col}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-              {myTrades.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-[var(--muted)]">
-                    No trade history
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {myTrades.map((trade, i) => (
+                  <tr
+                    key={`${trade.id ?? i}-${i}`}
+                    className="transition-colors hover:bg-[var(--panel-2)]"
+                    style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}
+                  >
+                    <td className="px-4 py-3 text-sm font-medium" style={{ color: "var(--text)" }}>
+                      {trade.market?.replace("_", "/")}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-sm" style={{ color: "var(--text)" }}>
+                      {formatNumber(trade.price, 2)}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-sm" style={{ color: "var(--text)" }}>
+                      {formatNumber(trade.quantity, 5)}
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--muted)" }}>
+                      {trade.created_at ? new Date(trade.created_at).toLocaleString() : "--"}
+                    </td>
+                  </tr>
+                ))}
+                {myTrades.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-12 text-center text-sm" style={{ color: "var(--muted)" }}>
+                      No trade history
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

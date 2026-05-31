@@ -16,14 +16,10 @@ type Props = {
   initialKlines: Kline[];
 };
 
-export default function MarketView({
-  market,
-  initialDepth,
-  initialKlines,
-}: Props) {
-  const [viewMode, setViewMode] = useState<ViewMode>("chart");
-  const [interval, setIntervalValue] = useState<Interval>("1m");
-  const [depth, setDepth] = useState<Depth>(() => createDepthFromSnapshot(initialDepth));
+export default function MarketView({ market, initialDepth, initialKlines }: Props) {
+  const [viewMode,  setViewMode]      = useState<ViewMode>("chart");
+  const [interval,  setIntervalValue] = useState<Interval>("1m");
+  const [depth,     setDepth]         = useState<Depth>(() => createDepthFromSnapshot(initialDepth));
 
   useEffect(() => {
     setDepth(createDepthFromSnapshot(initialDepth));
@@ -33,26 +29,17 @@ export default function MarketView({
     const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          type: "SUBSCRIBE",
-          market,
-          channels: ["depth"],
-        })
-      );
+      ws.send(JSON.stringify({ type: "SUBSCRIBE", market, channels: ["depth"] }));
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-
         if (message.market !== market) return;
-
         if (message.type === "depth_snapshot") {
           setDepth(createDepthFromSnapshot(message.data));
           return;
         }
-
         if (message.type === "depth_delta") {
           setDepth((prev) => applyDepthDelta(prev, message.data));
         }
@@ -61,65 +48,71 @@ export default function MarketView({
       }
     };
 
-    return () => {
-      ws.close();
-    };
+    return () => { ws.close(); };
   }, [market]);
 
   return (
-    <section className="exchange-panel overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode("chart")}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
-              viewMode === "chart"
-                ? "bg-[var(--panel-3)] text-[var(--text)]"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            Chart
-          </button>
-          <button
-            onClick={() => setViewMode("depth")}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
-              viewMode === "depth"
-                ? "bg-[var(--panel-3)] text-[var(--text)]"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            Depth
-          </button>
+    <section
+      className="overflow-hidden rounded-2xl border"
+      style={{ background: "var(--panel)", borderColor: "var(--border)" }}
+    >
+      {/* Tab bar */}
+      <div
+        className="flex items-center justify-between border-b px-4"
+        style={{ borderColor: "var(--border)" }}
+      >
+        {/* Chart / Depth tabs */}
+        <div className="flex items-center">
+          {(["chart", "depth"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className="relative px-4 py-3 text-sm font-medium capitalize transition-colors duration-150"
+              style={{ color: viewMode === mode ? "var(--text)" : "var(--muted)" }}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              {viewMode === mode && (
+                <span
+                  className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full"
+                  style={{ background: "var(--green)" }}
+                />
+              )}
+            </button>
+          ))}
         </div>
 
-        {viewMode === "chart" ? (
-          <div className="flex items-center gap-2">
+        {/* Interval pills — only when chart is active */}
+        {viewMode === "chart" && (
+          <div
+            className="flex items-center gap-1 rounded-lg border p-1"
+            style={{ borderColor: "var(--border)", background: "var(--panel-2)" }}
+          >
             {(["1m", "5m", "1h"] as const).map((item) => (
               <button
                 key={item}
                 onClick={() => setIntervalValue(item)}
-                className={`rounded-lg px-3 py-1.5 text-sm ${
+                className="rounded-md px-3 py-1 text-xs font-medium transition-colors duration-150"
+                style={
                   interval === item
-                    ? "bg-[var(--panel-3)] text-[var(--text)]"
-                    : "text-[var(--muted)]"
-                }`}
+                    ? { background: "var(--panel-3)", color: "var(--text)" }
+                    : { color: "var(--muted)" }
+                }
               >
                 {item}
               </button>
             ))}
           </div>
-        ) : null}
+        )}
       </div>
 
-      {viewMode === "chart" ? (
-        <ChartPanel
-          market={market}
-          interval={interval}
-          initialKlines={initialKlines}
-        />
-      ) : (
-        <DepthPanel depth={depth} />
-      )}
+      {/* Content */}
+      <div className="h-[420px]">
+        {viewMode === "chart" ? (
+          <ChartPanel market={market} interval={interval} initialKlines={initialKlines} />
+        ) : (
+          <DepthPanel depth={depth} />
+        )}
+      </div>
     </section>
   );
 }
