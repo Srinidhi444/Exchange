@@ -17,51 +17,135 @@ export default function OrderBookPanel() {
     [bids]
   );
 
-  const maxAsk = Math.max(...sortedAsks.map(([, qty]) => Number(qty)), 1);
-  const maxBid = Math.max(...sortedBids.map(([, qty]) => Number(qty)), 1);
+  // Max total (price × qty) for bar scaling — matches the reference
+  const askTotals = sortedAsks.map(([p, q]) => Number(p) * Number(q));
+  const bidTotals = sortedBids.map(([p, q]) => Number(p) * Number(q));
+  const maxAskTotal = Math.max(...askTotals, 1);
+  const maxBidTotal = Math.max(...bidTotals, 1);
+
+  const asksWithCumulative = useMemo(() => {
+    let cum = 0;
+    return [...sortedAsks].reverse().map(([price, qty]) => {
+      cum += Number(qty);
+      return { price, qty, cumulative: cum };
+    }).reverse();
+  }, [sortedAsks]);
+
+  const bidsWithCumulative = useMemo(() => {
+    let cum = 0;
+    return sortedBids.map(([price, qty]) => {
+      cum += Number(qty);
+      return { price, qty, cumulative: cum };
+    });
+  }, [sortedBids]);
+
+  const bestBid = sortedBids[0]?.[0];
+  const bestAsk = sortedAsks[sortedAsks.length - 1]?.[0];
+  const spread =
+    bestBid && bestAsk
+      ? (Number(bestAsk) - Number(bestBid)).toFixed(2)
+      : null;
 
   return (
-    <div className="exchange-panel h-[420px] overflow-hidden">
-      <div className="border-b border-[var(--border)] px-4 py-3 text-sm font-medium">
-        Order Book
+    <div
+      className="exchange-panel flex h-[480px] flex-col overflow-hidden"
+      style={{ fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+        <span className="text-sm font-semibold tracking-wide text-[var(--text)]">Order Book</span>
+        {spread && (
+          <span className="text-xs text-[var(--muted)]">
+            Spread <span className="ml-1 text-[var(--text)]">{spread}</span>
+          </span>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 px-4 py-2 text-xs text-[var(--muted)]">
-        <div>Price</div>
-        <div className="text-right">Amount</div>
+      {/* Column headers */}
+      <div className="grid grid-cols-3 px-4 pb-1 pt-2 text-[10px] uppercase tracking-widest text-[var(--muted)]">
+        <div>Price (USD)</div>
+        <div className="text-right">Size</div>
         <div className="text-right">Total</div>
       </div>
 
-      <div className="px-4">
-        {sortedAsks.map(([price, qty]) => {
-          const width = `${(Number(qty) / maxAsk) * 100}%`;
-          return (
-            <div key={`ask-${price}`} className="relative grid grid-cols-3 gap-2 py-1 text-xs">
-              <div className="absolute inset-y-0 right-0 bg-ask-soft" style={{ width }} />
-              <div className="relative z-10 text-ask">{formatNumber(price, 2)}</div>
-              <div className="relative z-10 text-right">{formatNumber(qty, 5)}</div>
-              <div className="relative z-10 text-right text-[var(--muted)]">
-                {formatNumber(Number(price) * Number(qty), 2)}
+      {/* Asks — highest ask at top, lowest ask nearest spread */}
+      <div className="flex flex-1 flex-col-reverse overflow-hidden">
+        <div className="flex flex-col">
+          {asksWithCumulative.map(({ price, qty }) => {
+            const total = Number(price) * Number(qty);
+            const barPct = (total / maxAskTotal) * 100;
+            return (
+              <div
+                key={`ask-${price}`}
+                className="grid grid-cols-3 px-4 py-[4px] text-xs hover:bg-white/[0.03]"
+              >
+                <div className="font-medium text-[#ea3943]">
+                  {formatNumber(price, 2)}
+                </div>
+                <div className="text-right text-[var(--text)]">
+                  {formatNumber(qty, 5)}
+                </div>
+                {/* Total cell with background bar inside it */}
+                <div className="relative text-right">
+                  <div
+                    className="absolute inset-y-0 right-0"
+                    style={{
+                      width: `${barPct}%`,
+                      background: "rgba(180,30,40,0.55)",
+                      borderRadius: "2px 0 0 2px",
+                    }}
+                  />
+                  <span className="relative z-10 text-[var(--text)]">
+                    {formatNumber(total, 2)}
+                  </span>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      <div className="border-y border-[var(--border)] bg-[var(--panel-2)] px-4 py-3 text-center text-sm font-semibold">
-        {sortedBids[0] ? formatNumber(sortedBids[0][0], 2) : "--"}
+      {/* Mid price row */}
+      <div className="flex items-center justify-center border-y border-[var(--border)] bg-[var(--panel-2)] px-4 py-2">
+        <span className="text-sm font-bold tabular-nums text-[var(--text)]">
+          {bestBid ? formatNumber(bestBid, 2) : "--"}
+        </span>
+        {spread && (
+          <span className="ml-3 text-[10px] text-[var(--muted)]">
+            spread {spread}
+          </span>
+        )}
       </div>
 
-      <div className="px-4 py-2">
-        {sortedBids.map(([price, qty]) => {
-          const width = `${(Number(qty) / maxBid) * 100}%`;
+      {/* Bids */}
+      <div className="flex-1 overflow-hidden">
+        {bidsWithCumulative.map(({ price, qty }) => {
+          const total = Number(price) * Number(qty);
+          const barPct = (total / maxBidTotal) * 100;
           return (
-            <div key={`bid-${price}`} className="relative grid grid-cols-3 gap-2 py-1 text-xs">
-              <div className="absolute inset-y-0 right-0 bg-bid-soft" style={{ width }} />
-              <div className="relative z-10 text-bid">{formatNumber(price, 2)}</div>
-              <div className="relative z-10 text-right">{formatNumber(qty, 5)}</div>
-              <div className="relative z-10 text-right text-[var(--muted)]">
-                {formatNumber(Number(price) * Number(qty), 2)}
+            <div
+              key={`bid-${price}`}
+              className="grid grid-cols-3 px-4 py-[4px] text-xs hover:bg-white/[0.03]"
+            >
+              <div className="font-medium text-[#16c784]">
+                {formatNumber(price, 2)}
+              </div>
+              <div className="text-right text-[var(--text)]">
+                {formatNumber(qty, 5)}
+              </div>
+              {/* Total cell with background bar inside it */}
+              <div className="relative text-right">
+                <div
+                  className="absolute inset-y-0 right-0"
+                  style={{
+                    width: `${barPct}%`,
+                    background: "rgba(14,120,80,0.55)",
+                    borderRadius: "2px 0 0 2px",
+                  }}
+                />
+                <span className="relative z-10 text-[var(--text)]">
+                  {formatNumber(total, 2)}
+                </span>
               </div>
             </div>
           );

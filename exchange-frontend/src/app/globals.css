@@ -84,3 +84,6 @@ a {
 .bg-ask-soft {
   background: rgba(234, 57, 67, 0.08);
 }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}

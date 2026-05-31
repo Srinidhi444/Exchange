@@ -75,19 +75,15 @@ export default function TradePageClient({
   const [interval, setInterval] = useState<ChartInterval>("1m");
   const privateSubscribedRef = useRef(false);
 
-  // Seed initial snapshot once on mount
   useEffect(() => {
     setDepth(initialDepth.bids, initialDepth.asks);
     setPublicTrades(initialTrades);
   }, [initialDepth, initialTrades, setDepth, setPublicTrades]);
 
-  // Public websocket — depth deltas + public trades
   useEffect(() => {
     wsManager.connect();
 
     const unsubscribeListener = wsManager.subscribe((event: IncomingWsEvent) => {
-
-      // ── Depth delta ────────────────────────────────────────────────
       if (
         "stream" in event &&
         event.stream === `depth@${market}` &&
@@ -100,7 +96,6 @@ export default function TradePageClient({
         );
       }
 
-      // ── Public trades ──────────────────────────────────────────────
       if (
         "stream" in event &&
         event.stream === `trade@${market}` &&
@@ -116,7 +111,6 @@ export default function TradePageClient({
         });
       }
 
-      // ── Balance updates ────────────────────────────────────────────
       if (
         "stream" in event &&
         event.stream.startsWith("balances@") &&
@@ -127,7 +121,6 @@ export default function TradePageClient({
         );
       }
 
-      // ── Personal trade history ─────────────────────────────────────
       if (
         "stream" in event &&
         event.stream.startsWith("trades@") &&
@@ -151,7 +144,6 @@ export default function TradePageClient({
         });
       }
 
-      // ── Order lifecycle ────────────────────────────────────────────
       if (
         "stream" in event &&
         event.stream.startsWith("orders@") &&
@@ -178,7 +170,6 @@ export default function TradePageClient({
         };
 
         if (data.event === "ORDER_CREATED" && data.order) {
-          // Only add to open orders panel if not already fully filled
           if (
             data.order.status !== "FILLED" &&
             (data.order.remainingQuantity ?? 0) > 0
@@ -249,7 +240,6 @@ export default function TradePageClient({
     removeOrder,
   ]);
 
-  // Private websocket — balances, orders, personal trades
   useEffect(() => {
     if (!hydrated) return;
 
@@ -393,15 +383,17 @@ export default function TradePageClient({
               )}
             </div>
 
-            {activeView === "chart" ? (
-              <ChartPanel
-                market={market}
-                interval={interval}
-                initialKlines={initialKlines}
-              />
-            ) : (
-              <DepthPanel depth={liveDepth} />
-            )}
+            <div className="h-[420px]">
+              {activeView === "chart" ? (
+                <ChartPanel
+                  market={market}
+                  interval={interval}
+                  initialKlines={initialKlines}
+                />
+              ) : (
+                <DepthPanel depth={liveDepth} />
+              )}
+            </div>
           </section>
 
           <RecentTradesPanel />

@@ -48,36 +48,33 @@ async function main() {
 
       if (message.type === "TRADE_CREATED") {
         const trade = message.data;
-
-        await client.query(
-          `
-          INSERT INTO trades (
-            id,
-            market,
-            buyer_user_id,
-            seller_user_id,
-            price,
-            quantity,
-            quote_quantity,
-            is_buyer_maker,
-            created_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          ON CONFLICT (id) DO NOTHING
-          `,
-          [
-            trade.tradeId,
-            trade.market,
-            trade.buyerUserId,
-            trade.sellerUserId,
-            trade.price,
-            trade.quantity,
-            trade.quoteQuantity,
-            trade.isBuyerMaker,
-            new Date(trade.timestamp),
-          ]
-        );
-
+        console.log("TRADE_CREATED payload", trade);
+       const result=await client.query(
+  `
+  INSERT INTO trades (
+    market,
+    buyer_user_id,
+    seller_user_id,
+    price,
+    quantity,
+    quote_quantity,
+    is_buyer_maker,
+    created_at
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  `,
+  [
+    trade.market,
+    trade.buyerUserId,
+    trade.sellerUserId,
+    trade.price,
+    trade.quantity,
+    trade.quoteQuantity,
+    trade.isBuyerMaker,
+    new Date(trade.timestamp),
+  ]
+);
+  console.log("insert rowCount", result.rowCount);
         console.log("Trade inserted successfully");
       } else if (message.type === "ORDER_CREATED") {
         const order = message.data;
