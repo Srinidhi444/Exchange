@@ -326,35 +326,49 @@ console.log("AFTER ADD ORDER", {
   }
 
   publishWsDepthUpdates(fills: Fills[], price: number, side: "BUY" | "SELL", market: string) {
-    const orderbook = this.orderbooks.get(market);
-    if (!orderbook) throw new Error("No orderbook found");
+  const orderbook = this.orderbooks.get(market);
+  if (!orderbook) throw new Error("No orderbook found");
 
-    const depth = orderbook.getDepth();
+  const depth = orderbook.getDepth();
 
-    if (side === "BUY") {
-      const updatedAsks = depth.asks.filter((x) =>
-        fills.map((f) => f.price.toString()).includes(x[0])
-      );
-      const updatedBid = depth.bids.find((x) => Number(x[0]) === price);
+  const filledPrices = fills.map((f) => f.price.toString());
 
-      RedisManager.getInstance().publishMessage(`depth@${market}`, {
-        stream: `depth@${market}`,
-        data: { a: updatedAsks, b: updatedBid ? [updatedBid] : [], e: "depth" },
-      });
-    }
+  if (side === "BUY") {
+    const updatedAsks: [string, string][] = filledPrices.map((fp) => {
+      const surviving = depth.asks.find((x) => x[0] === fp);
+      return surviving ?? [fp, "0"];
+    });
 
-    if (side === "SELL") {
-      const updatedBids = depth.bids.filter((x) =>
-        fills.map((f) => f.price.toString()).includes(x[0])
-      );
-      const updatedAsk = depth.asks.find((x) => Number(x[0]) === price);
+    const updatedBid = depth.bids.find((x) => Number(x[0]) === price);
 
-      RedisManager.getInstance().publishMessage(`depth@${market}`, {
-        stream: `depth@${market}`,
-        data: { a: updatedAsk ? [updatedAsk] : [], b: updatedBids, e: "depth" },
-      });
-    }
+    RedisManager.getInstance().publishMessage(`depth@${market}`, {
+      stream: `depth@${market}`,
+      data: {
+        a: updatedAsks,
+        b: updatedBid ? [updatedBid] : [],
+        e: "depth",
+      },
+    });
   }
+
+  if (side === "SELL") {
+    const updatedBids: [string, string][] = filledPrices.map((fp) => {
+      const surviving = depth.bids.find((x) => x[0] === fp);
+      return surviving ?? [fp, "0"];
+    });
+
+    const updatedAsk = depth.asks.find((x) => Number(x[0]) === price);
+
+    RedisManager.getInstance().publishMessage(`depth@${market}`, {
+      stream: `depth@${market}`,
+      data: {
+        a: updatedAsk ? [updatedAsk] : [],
+        b: updatedBids,
+        e: "depth",
+      },
+    });
+  }
+}
 
   publishWsTrades(fills: Fills[], userId: string, market: string) {
     fills.forEach((fill) => {

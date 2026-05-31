@@ -40,32 +40,34 @@ export default function DepthPanel({ depth }: Props) {
   }
 
   return (
-    <div className="flex h-[420px] flex-col">
+    <div className="flex h-[420px] flex-col bg-[var(--panel-2)]">
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setMode("chart")}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
+            className={`rounded-md px-3 py-1.5 text-sm transition ${
               mode === "chart"
-                ? "bg-[var(--yellow)] font-medium text-black"
-                : "bg-[var(--panel-3)] text-[var(--muted)]"
+                ? "bg-[var(--panel-4)] text-[var(--text)]"
+                : "text-[var(--muted)] hover:bg-[var(--panel-3)] hover:text-[var(--text)]"
             }`}
           >
             Graph
           </button>
           <button
             onClick={() => setMode("table")}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
+            className={`rounded-md px-3 py-1.5 text-sm transition ${
               mode === "table"
-                ? "bg-[var(--yellow)] font-medium text-black"
-                : "bg-[var(--panel-3)] text-[var(--muted)]"
+                ? "bg-[var(--panel-4)] text-[var(--text)]"
+                : "text-[var(--muted)] hover:bg-[var(--panel-3)] hover:text-[var(--text)]"
             }`}
           >
             Table
           </button>
         </div>
 
-        <div className="text-xs text-[var(--muted)]">Spread: {spread}</div>
+        <div className="text-xs text-[var(--muted)]">
+          Spread <span className="ml-1 text-[var(--text)]">{spread}</span>
+        </div>
       </div>
 
       {mode === "chart" ? (
@@ -104,7 +106,7 @@ export default function DepthPanel({ depth }: Props) {
               </div>
             </div>
 
-            <div className="border-y border-[var(--border)] bg-[var(--panel-2)] px-4 py-3">
+            <div className="border-y border-[var(--border)] bg-[var(--panel-3)] px-4 py-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[var(--muted)]">Spread</span>
                 <span className="text-sm font-medium text-[var(--text)]">{spread}</span>

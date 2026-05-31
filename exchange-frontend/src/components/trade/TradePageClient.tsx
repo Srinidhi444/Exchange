@@ -26,7 +26,6 @@ import { useBalancesStore } from "@/stores/balances-store";
 import { useOrdersStore } from "@/stores/orders-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { IncomingWsEvent } from "@/types/ws";
-import { mergeDepth } from "@/lib/depth-utils";
 
 interface TradePageClientProps {
   market: Market;
@@ -76,36 +75,32 @@ export default function TradePageClient({
   const [interval, setInterval] = useState<ChartInterval>("1m");
   const privateSubscribedRef = useRef(false);
 
+  // Seed initial snapshot once on mount
   useEffect(() => {
     setDepth(initialDepth.bids, initialDepth.asks);
     setPublicTrades(initialTrades);
   }, [initialDepth, initialTrades, setDepth, setPublicTrades]);
 
+  // Public websocket — depth deltas + public trades
   useEffect(() => {
     wsManager.connect();
 
     const unsubscribeListener = wsManager.subscribe((event: IncomingWsEvent) => {
+
+      // ── Depth delta ────────────────────────────────────────────────
       if (
         "stream" in event &&
         event.stream === `depth@${market}` &&
         "data" in event &&
         event.data?.e === "depth"
       ) {
-        const currentBook = useOrderbookStore.getState();
-        const nextDepth = mergeDepth(
-          {
-            bids: currentBook.bids ?? [],
-            asks: currentBook.asks ?? [],
-          },
-          {
-            bids: event.data.b ?? [],
-            asks: event.data.a ?? [],
-          }
+        useOrderbookStore.getState().applyDepthDelta(
+          event.data.b ?? [],
+          event.data.a ?? []
         );
-
-        useOrderbookStore.getState().setDepth(nextDepth.bids, nextDepth.asks);
       }
 
+      // ── Public trades ──────────────────────────────────────────────
       if (
         "stream" in event &&
         event.stream === `trade@${market}` &&
@@ -121,13 +116,23 @@ export default function TradePageClient({
         });
       }
 
-      if ("stream" in event && event.stream.startsWith("balances@") && "data" in event) {
+      // ── Balance updates ────────────────────────────────────────────
+      if (
+        "stream" in event &&
+        event.stream.startsWith("balances@") &&
+        "data" in event
+      ) {
         patchBalance(
           event.data as { asset: string; available: number; locked: number }
         );
       }
 
-      if ("stream" in event && event.stream.startsWith("trades@") && "data" in event) {
+      // ── Personal trade history ─────────────────────────────────────
+      if (
+        "stream" in event &&
+        event.stream.startsWith("trades@") &&
+        "data" in event
+      ) {
         const data = event.data as {
           tradeId: number;
           market: string;
@@ -146,7 +151,12 @@ export default function TradePageClient({
         });
       }
 
-      if ("stream" in event && event.stream.startsWith("orders@") && "data" in event) {
+      // ── Order lifecycle ────────────────────────────────────────────
+      if (
+        "stream" in event &&
+        event.stream.startsWith("orders@") &&
+        "data" in event
+      ) {
         const data = event.data as {
           event: string;
           orderId?: string;
@@ -168,20 +178,26 @@ export default function TradePageClient({
         };
 
         if (data.event === "ORDER_CREATED" && data.order) {
-          addOpenOrder({
-            orderId: data.order.orderId,
-            market: (data.order.market as Market) ?? market,
-            side: data.order.side ?? "BUY",
-            type: data.order.kind ?? "LIMIT",
-            price: data.order.price ?? 0,
-            quantity: data.order.quantity ?? 0,
-            filledQuantity: data.order.filledQuantity ?? 0,
-            remainingQuantity:
-              data.order.remainingQuantity ??
-              (data.order.quantity ?? 0) - (data.order.filledQuantity ?? 0),
-            status: data.order.status ?? "OPEN",
-            createdAt: data.order.createdAt ?? new Date().toISOString(),
-          });
+          // Only add to open orders panel if not already fully filled
+          if (
+            data.order.status !== "FILLED" &&
+            (data.order.remainingQuantity ?? 0) > 0
+          ) {
+            addOpenOrder({
+              orderId: data.order.orderId,
+              market: (data.order.market as Market) ?? market,
+              side: data.order.side ?? "BUY",
+              type: data.order.kind ?? "LIMIT",
+              price: data.order.price ?? 0,
+              quantity: data.order.quantity ?? 0,
+              filledQuantity: data.order.filledQuantity ?? 0,
+              remainingQuantity:
+                data.order.remainingQuantity ??
+                (data.order.quantity ?? 0) - (data.order.filledQuantity ?? 0),
+              status: data.order.status ?? "OPEN",
+              createdAt: data.order.createdAt ?? new Date().toISOString(),
+            });
+          }
         }
 
         if (data.event === "ORDER_CANCELLED" && data.orderId) {
@@ -233,6 +249,7 @@ export default function TradePageClient({
     removeOrder,
   ]);
 
+  // Private websocket — balances, orders, personal trades
   useEffect(() => {
     if (!hydrated) return;
 

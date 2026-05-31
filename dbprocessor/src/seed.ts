@@ -10,7 +10,6 @@ async function initializeDB() {
 
   console.log("Connected to Postgres DB");
 
-  // Extensions
   await client.query(`
     CREATE EXTENSION IF NOT EXISTS pgcrypto;
   `);
@@ -19,58 +18,12 @@ async function initializeDB() {
     CREATE EXTENSION IF NOT EXISTS timescaledb;
   `);
 
-  // Trades table
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS trades (
-      id BIGSERIAL PRIMARY KEY,
-
-      market VARCHAR(20) NOT NULL,
-
-      buyer_user_id UUID NOT NULL,
-      seller_user_id UUID NOT NULL,
-
-      price NUMERIC(30,10) NOT NULL,
-      quantity NUMERIC(30,10) NOT NULL,
-      quote_quantity NUMERIC(30,10) NOT NULL,
-
-      is_buyer_maker BOOLEAN NOT NULL,
-
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-
-  // Orders table
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS trade_orders (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-      user_id UUID NOT NULL,
-
-      market VARCHAR(20) NOT NULL,
-      side VARCHAR(4) NOT NULL,
-      type VARCHAR(10) NOT NULL,
-
-      price NUMERIC(30,10),
-
-      quantity NUMERIC(30,10) NOT NULL,
-      filled_quantity NUMERIC(30,10) DEFAULT 0,
-      remaining_quantity NUMERIC(30,10) NOT NULL,
-
-      status VARCHAR(20) NOT NULL,
-
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-
   // Users table
   await client.query(`
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
       email VARCHAR(255) UNIQUE NOT NULL,
       password VARCHAR(255) NOT NULL,
-
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
@@ -81,19 +34,48 @@ async function initializeDB() {
     SET DEFAULT gen_random_uuid();
   `);
 
+  // Trades table
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS trades (
+      id BIGSERIAL PRIMARY KEY,
+      market VARCHAR(20) NOT NULL,
+      buyer_user_id UUID NOT NULL,
+      seller_user_id UUID NOT NULL,
+      price NUMERIC(30,10) NOT NULL,
+      quantity NUMERIC(30,10) NOT NULL,
+      quote_quantity NUMERIC(30,10) NOT NULL,
+      is_buyer_maker BOOLEAN NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Orders table
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS trade_orders (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL,
+      market VARCHAR(20) NOT NULL,
+      side VARCHAR(4) NOT NULL,
+      type VARCHAR(10) NOT NULL,
+      price NUMERIC(30,10),
+      quantity NUMERIC(30,10) NOT NULL,
+      filled_quantity NUMERIC(30,10) DEFAULT 0,
+      remaining_quantity NUMERIC(30,10) NOT NULL,
+      status VARCHAR(20) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   // Balances table
   await client.query(`
     CREATE TABLE IF NOT EXISTS balances (
       id BIGSERIAL PRIMARY KEY,
-
       user_id UUID NOT NULL,
       asset VARCHAR(20) NOT NULL,
-
       available NUMERIC(30,10) DEFAULT 0,
       locked NUMERIC(30,10) DEFAULT 0,
-
       UNIQUE(user_id, asset),
-
       CONSTRAINT fk_user
         FOREIGN KEY(user_id)
         REFERENCES users(id)
@@ -105,17 +87,14 @@ async function initializeDB() {
   await client.query(`
     CREATE TABLE IF NOT EXISTS market_ticks (
       id BIGSERIAL PRIMARY KEY,
-
       market VARCHAR(20) NOT NULL,
-
       price NUMERIC(30,10) NOT NULL,
       volume NUMERIC(30,10) NOT NULL,
-
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
 
-  // Drop old materialized views
+  // Drop old K-line materialized views
   await client.query(`
     DROP MATERIALIZED VIEW IF EXISTS klines_1m;
   `);
@@ -128,64 +107,62 @@ async function initializeDB() {
     DROP MATERIALIZED VIEW IF EXISTS klines_1h;
   `);
 
-  // 1m klines
+  // Drop old regular views too, so recreate is clean
   await client.query(`
-    CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1m AS
+    DROP VIEW IF EXISTS klines_1m;
+  `);
+
+  await client.query(`
+    DROP VIEW IF EXISTS klines_5m;
+  `);
+
+  await client.query(`
+    DROP VIEW IF EXISTS klines_1h;
+  `);
+
+  // 1m klines as regular view
+  await client.query(`
+    CREATE VIEW klines_1m AS
     SELECT
       time_bucket('1 minute', created_at) AS bucket,
-
       first(price, created_at) AS open,
       max(price) AS high,
       min(price) AS low,
       last(price, created_at) AS close,
-
       sum(volume) AS volume,
-
       market
-
     FROM market_ticks
-
-    GROUP BY bucket, market;
+    GROUP BY time_bucket('1 minute', created_at), market;
   `);
 
-  // 5m klines
+  // 5m klines as regular view
   await client.query(`
-    CREATE MATERIALIZED VIEW IF NOT EXISTS klines_5m AS
+    CREATE VIEW klines_5m AS
     SELECT
       time_bucket('5 minutes', created_at) AS bucket,
-
       first(price, created_at) AS open,
       max(price) AS high,
       min(price) AS low,
       last(price, created_at) AS close,
-
       sum(volume) AS volume,
-
       market
-
     FROM market_ticks
-
-    GROUP BY bucket, market;
+    GROUP BY time_bucket('5 minutes', created_at), market;
   `);
 
-  // 1h klines
+  // 1h klines as regular view
   await client.query(`
-    CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1h AS
+    CREATE VIEW klines_1h AS
     SELECT
       time_bucket('1 hour', created_at) AS bucket,
-
       first(price, created_at) AS open,
       max(price) AS high,
       min(price) AS low,
       last(price, created_at) AS close,
-
       sum(volume) AS volume,
-
       market
-
     FROM market_ticks
-
-    GROUP BY bucket, market;
+    GROUP BY time_bucket('1 hour', created_at), market;
   `);
 
   // Indexes
@@ -209,11 +186,20 @@ async function initializeDB() {
     ON trades(seller_user_id);
   `);
 
-  console.log("Tables ensured.");
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_market_ticks_market_created_at
+    ON market_ticks(market, created_at DESC);
+  `);
+
+  console.log("Tables and views ensured.");
 
   await client.end();
 
   console.log("Disconnected from Postgres.");
 }
 
-initializeDB();
+initializeDB().catch(async (err) => {
+  console.error("DB init failed:", err);
+  await client.end();
+  process.exit(1);
+});

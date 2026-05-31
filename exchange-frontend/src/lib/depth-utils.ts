@@ -2,6 +2,11 @@ import { Depth, DepthLevel } from "@/types/api";
 
 export type DepthSide = "bids" | "asks";
 
+type DepthPoint = {
+  price: number;
+  cumulative: number;
+};
+
 function toNum(v: string | number) {
   return Number(v);
 }
@@ -52,31 +57,41 @@ export function mergeDepth(current: Depth, delta: Partial<Depth>): Depth {
   };
 }
 
-export function buildDepthSeries(depth: Depth, limit = 40) {
-  const bids = (depth?.bids ?? []).slice(0, limit);
-  const asks = (depth?.asks ?? []).slice(0, limit);
+export function buildDepthSeries(depth: Depth, limit = 60) {
+  // Bids: sorted highest → lowest price (best bid first)
+  const bidsRaw = (depth?.bids ?? [])
+    .map(([price, qty]) => ({ price: Number(price), qty: Number(qty) }))
+    .filter((x) => Number.isFinite(x.price) && Number.isFinite(x.qty) && x.qty > 0)
+    .sort((a, b) => b.price - a.price)
+    .slice(0, limit);
 
-  let cumulativeBid = 0;
-  const bidSeries = bids
-    .slice()
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([price, quantity]) => {
-      cumulativeBid += Number(quantity);
-      return {
-        price: Number(price),
-        quantity: Number(quantity),
-        cumulative: cumulativeBid,
-      };
-    });
+  // Asks: sorted lowest → highest price (best ask first)
+  const asksRaw = (depth?.asks ?? [])
+    .map(([price, qty]) => ({ price: Number(price), qty: Number(qty) }))
+    .filter((x) => Number.isFinite(x.price) && Number.isFinite(x.qty) && x.qty > 0)
+    .sort((a, b) => a.price - b.price)
+    .slice(0, limit);
 
-  let cumulativeAsk = 0;
-  const askSeries = asks.map(([price, quantity]) => {
-    cumulativeAsk += Number(quantity);
-    return {
-      price: Number(price),
-      quantity: Number(quantity),
-      cumulative: cumulativeAsk,
-    };
+  // Bids accumulate from highest price → lowest price.
+  // This means the point at the far LEFT (lowest price) has the MOST cumulative depth,
+  // and the point nearest mid-price (highest price, rightmost bid) has the LEAST.
+  // Result: a curve that starts tall on the left and descends toward mid-price. ✓
+  let bidRunning = 0;
+  const bidSeries: DepthPoint[] = bidsRaw.map((level) => {
+    bidRunning += level.qty;
+    return { price: level.price, cumulative: bidRunning };
+  });
+  // bidSeries is now ordered highest→lowest price with cumulative growing as we go left.
+  // Reverse so chart receives points in ascending price order (Recharts requires this).
+  bidSeries.reverse();
+
+  // Asks accumulate from lowest price → highest price.
+  // The point nearest mid-price (leftmost ask) has the LEAST cumulative depth,
+  // and the far-right point has the MOST. Result: ascending curve away from mid. ✓
+  let askRunning = 0;
+  const askSeries: DepthPoint[] = asksRaw.map((level) => {
+    askRunning += level.qty;
+    return { price: level.price, cumulative: askRunning };
   });
 
   return { bidSeries, askSeries };
